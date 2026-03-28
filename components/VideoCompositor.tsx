@@ -64,6 +64,7 @@ export function VideoCompositor({ waveId, theme, title, description, isActive, w
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number>(0);
   const imgRef = useRef<HTMLImageElement | null>(null);
+  const imgLoaded = useRef(false);
   const startTime = useRef(0);
 
   const cfg = THEME_CONFIG[theme] ?? DEFAULT_CONFIG;
@@ -81,8 +82,10 @@ export function VideoCompositor({ waveId, theme, title, description, isActive, w
     startTime.current = performance.now();
 
     // Load the content-matched image
+    imgLoaded.current = false;
     const img = new Image();
-    img.crossOrigin = "anonymous";
+    img.onload = () => { imgLoaded.current = true; };
+    img.onerror = () => { imgLoaded.current = false; };
     img.src = imageUrl;
     imgRef.current = img;
 
@@ -109,7 +112,7 @@ export function VideoCompositor({ waveId, theme, title, description, isActive, w
       ctx.fillRect(0, 0, width, height);
 
       // Draw base image with slow cinematic camera drift
-      if (img.complete && img.naturalWidth > 0) {
+      if (imgLoaded.current) {
         ctx.save();
 
         // Camera: slow drift + gentle zoom over time
@@ -133,9 +136,10 @@ export function VideoCompositor({ waveId, theme, title, description, isActive, w
 
         ctx.restore();
       } else {
-        // Loading: show theme-colored gradient
-        const g = ctx.createLinearGradient(0, 0, 0, height);
-        g.addColorStop(0, cfg.fogColor);
+        // Image not loaded yet or failed: rich theme gradient
+        const g = ctx.createRadialGradient(width * 0.4, height * 0.35, 0, width / 2, height / 2, width);
+        g.addColorStop(0, cfg.lightColor + "30");
+        g.addColorStop(0.5, cfg.fogColor);
         g.addColorStop(1, "#000");
         ctx.fillStyle = g;
         ctx.fillRect(0, 0, width, height);
@@ -210,25 +214,23 @@ export function VideoCompositor({ waveId, theme, title, description, isActive, w
       ctx.fillStyle = btm;
       ctx.fillRect(0, 0, width, height);
 
-      // Subtle film grain
-      if (Math.random() > 0.5) {
-        const imgData = ctx.getImageData(0, 0, width, height);
-        const d = imgData.data;
-        for (let i = 0; i < d.length; i += 40) {
-          const n = (Math.random() - 0.5) * 5;
-          d[i] = Math.min(255, Math.max(0, d[i] + n));
-          d[i+1] = Math.min(255, Math.max(0, d[i+1] + n));
-          d[i+2] = Math.min(255, Math.max(0, d[i+2] + n));
+      // Film grain (skip if canvas is tainted by cross-origin image)
+      try {
+        if (Math.random() > 0.7) {
+          const imgData = ctx.getImageData(0, 0, width, height);
+          const d = imgData.data;
+          for (let i = 0; i < d.length; i += 60) {
+            const n = (Math.random() - 0.5) * 4;
+            d[i] += n; d[i+1] += n; d[i+2] += n;
+          }
+          ctx.putImageData(imgData, 0, 0);
         }
-        ctx.putImageData(imgData, 0, 0);
-      }
+      } catch {}
 
       rafRef.current = requestAnimationFrame(render);
     }
 
-    // Start rendering when image loads (or immediately with gradient bg)
-    img.onload = () => { rafRef.current = requestAnimationFrame(render); };
-    // Also start immediately for loading state
+    // Start rendering immediately (gradient bg shown while image loads)
     rafRef.current = requestAnimationFrame(render);
 
     return () => cancelAnimationFrame(rafRef.current);
