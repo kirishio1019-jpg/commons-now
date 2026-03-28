@@ -60,6 +60,31 @@ export default function CreateWaveScreen() {
 
     setPosting(true);
     try {
+      // First ensure user has an organization (create personal one if needed)
+      let orgId: string;
+      const { data: existingOrg } = await supabase
+        .from("organizations")
+        .select("id")
+        .eq("name", user.email || user.id)
+        .limit(1)
+        .single();
+
+      if (existingOrg) {
+        orgId = existingOrg.id;
+      } else {
+        const { data: newOrg, error: orgErr } = await supabase
+          .from("organizations")
+          .insert({
+            name: user.email?.split("@")[0] || "個人",
+            type: "individual_steward",
+            description: "個人オーガナイザー",
+          })
+          .select("id")
+          .single();
+        if (orgErr) throw orgErr;
+        orgId = newOrg.id;
+      }
+
       const { error } = await supabase.from("waves").insert({
         title,
         theme,
@@ -73,7 +98,7 @@ export default function CreateWaveScreen() {
         date,
         time_start: timeStart,
         time_end: timeEnd || timeStart,
-        organizer_id: user.id,
+        organizer_id: orgId,
         capacity: parseInt(capacity, 10) || 10,
         current_participants: 0,
         eco_impact_target: {
@@ -85,7 +110,7 @@ export default function CreateWaveScreen() {
         image_url: "",
         is_personalized: false,
         is_auto_generated: false,
-        status: "active",
+        status: "upcoming",
       });
 
       if (error) throw error;
