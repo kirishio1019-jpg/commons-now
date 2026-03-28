@@ -1,12 +1,8 @@
-// Cinematic Video Compositor v3
-// Multi-layer: media + SVG motion filters + particle canvas + color grading
-// SVG feTurbulence makes images "breathe" and "flow" like real video
+// Cinematic Scene Generator v4
+// 1 content-matched image → deep motion + atmosphere → continuous 60fps "video"
+// NO clip stitching. Single shot, evolving storyline.
 
-import React, { useEffect, useRef, useState, useMemo, useCallback } from "react";
-import { View, StyleSheet } from "react-native";
-import {
-  generateStoryboard, Storyboard, Segment, SVGFilterType, ParticleType,
-} from "../lib/storyboardGenerator";
+import React, { useEffect, useRef, useMemo } from "react";
 
 interface Props {
   waveId: string;
@@ -18,156 +14,63 @@ interface Props {
   height: number;
 }
 
+// Theme → LoremFlickr keywords + atmosphere config
+const THEME_CONFIG: Record<string, {
+  keywords: string;
+  atmosphere: "warm" | "cool" | "dark" | "bright" | "golden";
+  particleColor: string;
+  particleType: "rise" | "fall" | "float" | "streak";
+  fogColor: string;
+  fogOpacity: number;
+  lightColor: string;
+  displacement: number;  // SVG turbulence intensity
+  displaceSpeed: number; // Animation speed
+}> = {
+  植樹:     { keywords: "planting trees forest nature", atmosphere: "warm", particleColor: "#86efac", particleType: "fall", fogColor: "#1B4332", fogOpacity: 0.15, lightColor: "#fde68a", displacement: 12, displaceSpeed: 10 },
+  食:       { keywords: "cooking food kitchen community", atmosphere: "golden", particleColor: "#fef3c7", particleType: "rise", fogColor: "#78350F", fogOpacity: 0.1, lightColor: "#fbbf24", displacement: 8, displaceSpeed: 12 },
+  物語:     { keywords: "campfire night storytelling people", atmosphere: "dark", particleColor: "#fca5a5", particleType: "rise", fogColor: "#1E1B4B", fogOpacity: 0.2, lightColor: "#c4b5fd", displacement: 14, displaceSpeed: 8 },
+  雨水収集: { keywords: "rain nature water green leaves", atmosphere: "cool", particleColor: "#93c5fd", particleType: "streak", fogColor: "#0C3547", fogOpacity: 0.2, lightColor: "#67e8f9", displacement: 18, displaceSpeed: 6 },
+  音楽:     { keywords: "concert music guitar outdoor people", atmosphere: "golden", particleColor: "#ddd6fe", particleType: "float", fogColor: "#3B0764", fogOpacity: 0.12, lightColor: "#a78bfa", displacement: 10, displaceSpeed: 10 },
+  ヨガ:     { keywords: "yoga sunrise peaceful outdoor nature", atmosphere: "warm", particleColor: "#bfdbfe", particleType: "float", fogColor: "#1E3A5F", fogOpacity: 0.1, lightColor: "#fde68a", displacement: 6, displaceSpeed: 14 },
+  アート:   { keywords: "art painting creative colorful studio", atmosphere: "bright", particleColor: "#f5d0fe", particleType: "float", fogColor: "#4A1942", fogOpacity: 0.08, lightColor: "#f0abfc", displacement: 14, displaceSpeed: 8 },
+  対話:     { keywords: "people conversation cafe community", atmosphere: "golden", particleColor: "#fef3c7", particleType: "float", fogColor: "#1A1A2E", fogOpacity: 0.1, lightColor: "#fbbf24", displacement: 6, displaceSpeed: 14 },
+  DIY:      { keywords: "workshop tools woodworking crafting hands", atmosphere: "warm", particleColor: "#fde68a", particleType: "float", fogColor: "#3D2B1F", fogOpacity: 0.12, lightColor: "#d97706", displacement: 8, displaceSpeed: 12 },
+  ハイキング:{ keywords: "hiking mountain trail nature scenic", atmosphere: "bright", particleColor: "#d1fae5", particleType: "float", fogColor: "#065F46", fogOpacity: 0.15, lightColor: "#6ee7b7", displacement: 10, displaceSpeed: 10 },
+  焚き火:   { keywords: "bonfire campfire flames night warm", atmosphere: "dark", particleColor: "#fed7aa", particleType: "rise", fogColor: "#7C2D12", fogOpacity: 0.15, lightColor: "#f97316", displacement: 20, displaceSpeed: 5 },
+  農業:     { keywords: "farming harvest vegetables field garden", atmosphere: "bright", particleColor: "#dcfce7", particleType: "float", fogColor: "#166534", fogOpacity: 0.1, lightColor: "#86efac", displacement: 8, displaceSpeed: 12 },
+  瞑想:     { keywords: "meditation zen garden peaceful morning", atmosphere: "cool", particleColor: "#cbd5e1", particleType: "float", fogColor: "#0F172A", fogOpacity: 0.2, lightColor: "#94a3b8", displacement: 5, displaceSpeed: 16 },
+  星空:     { keywords: "night sky stars landscape dark", atmosphere: "dark", particleColor: "#e0e7ff", particleType: "float", fogColor: "#0F172A", fogOpacity: 0.1, lightColor: "#818cf8", displacement: 4, displaceSpeed: 18 },
+  子どもと: { keywords: "children playing park outdoor family", atmosphere: "bright", particleColor: "#a7f3d0", particleType: "float", fogColor: "#047857", fogOpacity: 0.08, lightColor: "#fde68a", displacement: 8, displaceSpeed: 12 },
+};
+
+const DEFAULT_CONFIG = THEME_CONFIG["植樹"];
+
+function hash(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+
+function getImageUrl(theme: string, title: string, waveId: string): string {
+  const cfg = THEME_CONFIG[theme] ?? DEFAULT_CONFIG;
+  // Extract title keywords for more specific image
+  const titleWords = title.replace(/[—\-「」（）。、：]/g, " ").split(/\s+/).filter(w => w.length > 1).slice(0, 2).join(",");
+  const kw = titleWords ? `${cfg.keywords},${titleWords}` : cfg.keywords;
+  const lock = hash(waveId) % 100000;
+  return `https://loremflickr.com/720/1280/${encodeURIComponent(kw)}?lock=${lock}`;
+}
+
 export function VideoCompositor({ waveId, theme, title, description, isActive, width, height }: Props) {
-  const [idx, setIdx] = useState(0);
-  const [fading, setFading] = useState(false);
-  const timerRef = useRef<any>(null);
-
-  const sb = useMemo(
-    () => generateStoryboard(waveId, theme, title, description),
-    [waveId, theme, title, description]
-  );
-
-  // Auto-advance
-  useEffect(() => {
-    if (!isActive || sb.segments.length < 2) return;
-    timerRef.current = setTimeout(() => {
-      setFading(true);
-      setTimeout(() => {
-        setIdx((p) => (p + 1) % sb.segments.length);
-        setFading(false);
-      }, 1500);
-    }, (sb.segments[idx]?.duration ?? 5) * 1000);
-    return () => clearTimeout(timerRef.current);
-  }, [isActive, idx, sb]);
-
-  const seg = sb.segments[idx];
-  const nextSeg = sb.segments[(idx + 1) % sb.segments.length];
-  const grade = sb.colorGrade;
-
-  return (
-    <div style={{ position: "absolute", inset: 0, overflow: "hidden", background: "#000" }}>
-      {/* SVG filter definitions */}
-      <SVGFilters />
-
-      {/* Current segment */}
-      <MediaSegment seg={seg} isActive={isActive} opacity={fading ? 0 : 1} index={idx} width={width} height={height} />
-
-      {/* Next segment (visible during fade) */}
-      {fading && <MediaSegment seg={nextSeg} isActive={isActive} opacity={1} index={idx + 1} width={width} height={height} />}
-
-      {/* Particle overlay canvas */}
-      {isActive && sb.globalParticle && (
-        <ParticleCanvas type={sb.globalParticle} width={width} height={height} />
-      )}
-
-      {/* Color grading */}
-      <div style={{
-        position: "absolute", inset: 0,
-        background: `hsla(${grade.hue}, 40%, 25%, 0.12)`,
-        mixBlendMode: "overlay" as any,
-        zIndex: 20, pointerEvents: "none",
-      }} />
-      <div style={{
-        position: "absolute", inset: 0,
-        filter: `saturate(${grade.saturation}) brightness(${grade.brightness})`,
-        zIndex: 21, pointerEvents: "none",
-      }} />
-
-      {/* Vignette */}
-      <div style={{
-        position: "absolute", inset: 0,
-        background: "radial-gradient(ellipse at center, transparent 20%, rgba(0,0,0,0.6) 100%)",
-        zIndex: 22, pointerEvents: "none",
-      }} />
-
-      {/* Film grain */}
-      <div style={{
-        position: "absolute", inset: 0, opacity: 0.04, zIndex: 23, pointerEvents: "none",
-        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='0.8'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
-      }} />
-
-      {/* CSS keyframes for Ken Burns */}
-      <style dangerouslySetInnerHTML={{ __html: buildKeyframes(sb.segments) }} />
-    </div>
-  );
-}
-
-// --- SVG Motion Filters ---
-function SVGFilters() {
-  return (
-    <svg style={{ position: "absolute", width: 0, height: 0 }}>
-      <defs>
-        {/* Liquid: organic flowing motion */}
-        <filter id="svgf-liquid">
-          <feTurbulence type="fractalNoise" baseFrequency="0.012" numOctaves="3" result="turb">
-            <animate attributeName="baseFrequency" values="0.012;0.018;0.012" dur="8s" repeatCount="indefinite" />
-          </feTurbulence>
-          <feDisplacementMap in="SourceGraphic" in2="turb" scale="22" />
-        </filter>
-        {/* Ripple: water surface */}
-        <filter id="svgf-ripple">
-          <feTurbulence type="turbulence" baseFrequency="0.025" numOctaves="2" result="turb">
-            <animate attributeName="baseFrequency" values="0.025;0.035;0.025" dur="5s" repeatCount="indefinite" />
-          </feTurbulence>
-          <feDisplacementMap in="SourceGraphic" in2="turb" scale="15" />
-        </filter>
-        {/* Heat: shimmer/fire */}
-        <filter id="svgf-heat">
-          <feTurbulence type="fractalNoise" baseFrequency="0.008" numOctaves="4" result="turb">
-            <animate attributeName="baseFrequency" values="0.008;0.015;0.008" dur="4s" repeatCount="indefinite" />
-          </feTurbulence>
-          <feDisplacementMap in="SourceGraphic" in2="turb" scale="30" />
-        </filter>
-        {/* Breathe: ultra-subtle pulse */}
-        <filter id="svgf-breathe">
-          <feTurbulence type="fractalNoise" baseFrequency="0.005" numOctaves="2" result="turb">
-            <animate attributeName="baseFrequency" values="0.005;0.009;0.005" dur="10s" repeatCount="indefinite" />
-          </feTurbulence>
-          <feDisplacementMap in="SourceGraphic" in2="turb" scale="10" />
-        </filter>
-      </defs>
-    </svg>
-  );
-}
-
-// --- Media Segment Renderer ---
-function MediaSegment({ seg, isActive, opacity, index, width, height }: {
-  seg: Segment; isActive: boolean; opacity: number; index: number; width: number; height: number;
-}) {
-  if (!seg) return null;
-  const kb = seg.motion.kenBurns;
-  const anim = `kb${index} ${seg.duration + 3}s ease-in-out infinite alternate`;
-  const svgFilter = seg.motion.svgFilter !== "none" ? `url(#svgf-${seg.motion.svgFilter})` : "none";
-
-  const mediaCSS: React.CSSProperties = {
-    position: "absolute",
-    top: "-15%", left: "-15%", width: "130%", height: "130%",
-    objectFit: "cover" as any,
-    animation: isActive ? anim : "none",
-    filter: svgFilter,
-  };
-
-  return (
-    <div style={{
-      position: "absolute", inset: 0, overflow: "hidden",
-      opacity, transition: "opacity 1.5s ease-in-out",
-      zIndex: opacity === 1 ? 2 : 1,
-    }}>
-      {seg.media.type === "video" ? (
-        <video src={seg.media.url} autoPlay={isActive} loop muted playsInline style={mediaCSS} />
-      ) : (
-        <img src={seg.media.url} alt="" style={mediaCSS} loading="eager" />
-      )}
-    </div>
-  );
-}
-
-// --- Particle Canvas Overlay ---
-function ParticleCanvas({ type, width, height }: { type: ParticleType; width: number; height: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const particles = useRef<{ x: number; y: number; vx: number; vy: number; s: number; o: number; life: number; max: number }[]>([]);
   const rafRef = useRef<number>(0);
+  const imgRef = useRef<HTMLImageElement | null>(null);
+  const startTime = useRef(0);
+
+  const cfg = THEME_CONFIG[theme] ?? DEFAULT_CONFIG;
+  const imageUrl = useMemo(() => getImageUrl(theme, title, waveId), [theme, title, waveId]);
+
+  // Particle system
+  const particles = useRef<{ x: number; y: number; vx: number; vy: number; s: number; o: number; life: number; max: number }[]>([]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -175,82 +78,169 @@ function ParticleCanvas({ type, width, height }: { type: ParticleType; width: nu
     const ctx = canvas.getContext("2d")!;
     canvas.width = width;
     canvas.height = height;
+    startTime.current = performance.now();
 
-    const configs: Record<string, { count: number; color: string; sizeRange: [number, number]; vyRange: [number, number]; vxRange: [number, number] }> = {
-      embers:  { count: 30, color: "#FF6B35", sizeRange: [1, 3], vyRange: [-2, -0.5], vxRange: [-0.5, 0.5] },
-      leaves:  { count: 20, color: "#4ADE80", sizeRange: [2, 5], vyRange: [0.3, 1.5], vxRange: [-1, 1] },
-      rain:    { count: 50, color: "#93C5FD", sizeRange: [1, 2], vyRange: [4, 8], vxRange: [-0.2, 0.2] },
-      stars:   { count: 40, color: "#E0E7FF", sizeRange: [1, 3], vyRange: [-0.1, 0.1], vxRange: [-0.1, 0.1] },
-      steam:   { count: 15, color: "#F1F5F9", sizeRange: [3, 8], vyRange: [-1, -0.3], vxRange: [-0.3, 0.3] },
-      dust:    { count: 25, color: "#D4D4D8", sizeRange: [1, 3], vyRange: [-0.3, 0.3], vxRange: [-0.3, 0.3] },
-      notes:   { count: 12, color: "#C084FC", sizeRange: [2, 4], vyRange: [-1.5, -0.5], vxRange: [-0.8, 0.8] },
-      bubbles: { count: 18, color: "#A5F3FC", sizeRange: [2, 6], vyRange: [-1, -0.3], vxRange: [-0.5, 0.5] },
-    };
+    // Load the content-matched image
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.src = imageUrl;
+    imgRef.current = img;
 
-    const cfg = configs[type ?? "dust"] ?? configs.dust;
-
-    particles.current = Array.from({ length: cfg.count }, () => ({
+    // Init particles
+    const pCount = cfg.particleType === "streak" ? 40 : 25;
+    particles.current = Array.from({ length: pCount }, () => ({
       x: Math.random() * width,
-      y: type === "rain" ? -10 : Math.random() * height,
-      vx: cfg.vxRange[0] + Math.random() * (cfg.vxRange[1] - cfg.vxRange[0]),
-      vy: cfg.vyRange[0] + Math.random() * (cfg.vyRange[1] - cfg.vyRange[0]),
-      s: cfg.sizeRange[0] + Math.random() * (cfg.sizeRange[1] - cfg.sizeRange[0]),
-      o: 0, life: 0,
-      max: 80 + Math.random() * 200,
+      y: Math.random() * height,
+      vx: (Math.random() - 0.5) * 0.8,
+      vy: cfg.particleType === "rise" ? -(0.3 + Math.random() * 1.5)
+        : cfg.particleType === "fall" ? (0.2 + Math.random() * 1)
+        : cfg.particleType === "streak" ? (3 + Math.random() * 6)
+        : (Math.random() - 0.5) * 0.4,
+      s: cfg.particleType === "streak" ? 1 : (1 + Math.random() * 3),
+      o: 0, life: Math.random() * 100, max: 100 + Math.random() * 200,
     }));
 
-    function draw() {
-      ctx.clearRect(0, 0, width, height);
+    function render() {
+      if (!isActive) return;
+      const t = (performance.now() - startTime.current) / 1000; // seconds
+
+      // Clear
+      ctx.fillStyle = "#000";
+      ctx.fillRect(0, 0, width, height);
+
+      // Draw base image with slow cinematic camera drift
+      if (img.complete && img.naturalWidth > 0) {
+        ctx.save();
+
+        // Camera: slow drift + gentle zoom over time
+        const driftX = Math.sin(t * 0.08) * width * 0.03;
+        const driftY = Math.cos(t * 0.06) * height * 0.02;
+        const zoom = 1.15 + Math.sin(t * 0.04) * 0.05;
+
+        const iw = width * zoom;
+        const ih = height * zoom;
+        const ix = (width - iw) / 2 + driftX;
+        const iy = (height - ih) / 2 + driftY;
+
+        ctx.drawImage(img, ix, iy, iw, ih);
+
+        // Atmosphere overlay tint
+        const atmoAlpha = cfg.fogOpacity + Math.sin(t * 0.15) * 0.03;
+        ctx.globalAlpha = atmoAlpha;
+        ctx.fillStyle = cfg.fogColor;
+        ctx.fillRect(0, 0, width, height);
+        ctx.globalAlpha = 1;
+
+        ctx.restore();
+      } else {
+        // Loading: show theme-colored gradient
+        const g = ctx.createLinearGradient(0, 0, 0, height);
+        g.addColorStop(0, cfg.fogColor);
+        g.addColorStop(1, "#000");
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, width, height);
+      }
+
+      // Evolving light ray (moves across the scene over time)
+      const rayX = (Math.sin(t * 0.1) + 1) * 0.5 * width;
+      const rayGrad = ctx.createRadialGradient(rayX, height * 0.3, 0, rayX, height * 0.3, width * 0.5);
+      rayGrad.addColorStop(0, cfg.lightColor + "15");
+      rayGrad.addColorStop(0.5, cfg.lightColor + "08");
+      rayGrad.addColorStop(1, "transparent");
+      ctx.fillStyle = rayGrad;
+      ctx.fillRect(0, 0, width, height);
+
+      // Fog layer that moves
+      const fogX = Math.sin(t * 0.05) * 50;
+      ctx.save();
+      ctx.globalAlpha = 0.06 + Math.sin(t * 0.2) * 0.02;
+      const fogGrad = ctx.createLinearGradient(fogX, height * 0.6, fogX + width, height);
+      fogGrad.addColorStop(0, "transparent");
+      fogGrad.addColorStop(0.5, cfg.fogColor);
+      fogGrad.addColorStop(1, "transparent");
+      ctx.fillStyle = fogGrad;
+      ctx.fillRect(0, height * 0.5, width, height * 0.5);
+      ctx.restore();
+
+      // Particles
       for (const p of particles.current) {
         p.x += p.vx;
         p.y += p.vy;
         p.life++;
         const lr = p.life / p.max;
-        p.o = lr < 0.15 ? lr / 0.15 : lr > 0.75 ? (1 - lr) / 0.25 : 1;
+        p.o = lr < 0.1 ? lr / 0.1 : lr > 0.8 ? (1 - lr) / 0.2 : 1;
 
-        if (p.life >= p.max || p.y > height + 10 || p.y < -10) {
+        if (p.life >= p.max || p.y > height + 10 || p.y < -10 || p.x > width + 10 || p.x < -10) {
           p.x = Math.random() * width;
-          p.y = cfg.vyRange[0] > 0 ? -10 : (cfg.vyRange[1] < 0 ? height + 10 : Math.random() * height);
+          p.y = cfg.particleType === "rise" || cfg.particleType === "float" ? height + 5
+            : cfg.particleType === "streak" ? -5
+            : Math.random() * height;
           p.life = 0;
         }
 
-        ctx.globalAlpha = p.o * 0.6;
-        ctx.beginPath();
-        if (type === "rain") {
+        ctx.globalAlpha = p.o * 0.5;
+        if (cfg.particleType === "streak") {
+          ctx.strokeStyle = cfg.particleColor;
+          ctx.lineWidth = 0.5;
+          ctx.beginPath();
           ctx.moveTo(p.x, p.y);
-          ctx.lineTo(p.x + p.vx, p.y + 8);
-          ctx.strokeStyle = cfg.color;
-          ctx.lineWidth = p.s * 0.5;
+          ctx.lineTo(p.x + p.vx * 0.3, p.y - 6);
           ctx.stroke();
         } else {
+          ctx.fillStyle = cfg.particleColor;
+          ctx.beginPath();
           ctx.arc(p.x, p.y, p.s, 0, Math.PI * 2);
-          ctx.fillStyle = cfg.color;
           ctx.fill();
         }
       }
       ctx.globalAlpha = 1;
-      rafRef.current = requestAnimationFrame(draw);
+
+      // Vignette
+      const vig = ctx.createRadialGradient(width / 2, height / 2, width * 0.2, width / 2, height / 2, width * 0.85);
+      vig.addColorStop(0, "transparent");
+      vig.addColorStop(1, "rgba(0,0,0,0.55)");
+      ctx.fillStyle = vig;
+      ctx.fillRect(0, 0, width, height);
+
+      // Bottom darkening for text readability
+      const btm = ctx.createLinearGradient(0, height * 0.5, 0, height);
+      btm.addColorStop(0, "transparent");
+      btm.addColorStop(0.6, "rgba(0,0,0,0.3)");
+      btm.addColorStop(1, "rgba(0,0,0,0.8)");
+      ctx.fillStyle = btm;
+      ctx.fillRect(0, 0, width, height);
+
+      // Subtle film grain
+      if (Math.random() > 0.5) {
+        const imgData = ctx.getImageData(0, 0, width, height);
+        const d = imgData.data;
+        for (let i = 0; i < d.length; i += 40) {
+          const n = (Math.random() - 0.5) * 5;
+          d[i] = Math.min(255, Math.max(0, d[i] + n));
+          d[i+1] = Math.min(255, Math.max(0, d[i+1] + n));
+          d[i+2] = Math.min(255, Math.max(0, d[i+2] + n));
+        }
+        ctx.putImageData(imgData, 0, 0);
+      }
+
+      rafRef.current = requestAnimationFrame(render);
     }
 
-    rafRef.current = requestAnimationFrame(draw);
+    // Start rendering when image loads (or immediately with gradient bg)
+    img.onload = () => { rafRef.current = requestAnimationFrame(render); };
+    // Also start immediately for loading state
+    rafRef.current = requestAnimationFrame(render);
+
     return () => cancelAnimationFrame(rafRef.current);
-  }, [type, width, height]);
+  }, [isActive, imageUrl, width, height, cfg]);
 
   return (
     <canvas
       ref={canvasRef}
-      style={{ position: "absolute", inset: 0, zIndex: 15, pointerEvents: "none" }}
+      style={{
+        position: "absolute", top: 0, left: 0,
+        width, height,
+      }}
     />
   );
-}
-
-// --- Keyframe generator ---
-function buildKeyframes(segments: Segment[]): string {
-  return segments.map((seg, i) => {
-    const kb = seg.motion.kenBurns;
-    return `@keyframes kb${i} {
-      from { transform: scale(${kb.fromScale}) translate(${kb.fromX}%, ${kb.fromY}%); }
-      to { transform: scale(${kb.toScale}) translate(${kb.toX}%, ${kb.toY}%); }
-    }`;
-  }).join("\n");
 }
