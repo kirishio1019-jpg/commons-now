@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { View, Text, StyleSheet, Pressable, Platform } from "react-native";
 import { router } from "expo-router";
-import { Video, ResizeMode } from "expo-av";
 import { Wave, CommitLevel } from "../types";
 import { Colors } from "../lib/colors";
+import { VideoCompositor } from "./VideoCompositor";
 import { AnimatedBackground } from "./AnimatedBackground";
+import { selectClips } from "../lib/aiVideo";
 import { supabase } from "../lib/supabase";
 
 interface WaveFeedItemProps {
@@ -36,35 +37,27 @@ export function WaveFeedItem({
       .then(({ data }) => { if (data) setOrgName(data.name); });
   }, [wave.organizer_id]);
 
+  // Select 3 content-matched clips for the compositor
+  const videoClips = useMemo(
+    () => Platform.OS === "web" ? selectClips(wave.theme, wave.title, wave.description) : [],
+    [wave.theme, wave.title, wave.description]
+  );
+
   const isOnline = wave.location?.is_online === true;
-  const hasVideo = wave.image_url && wave.image_url.length > 5;
 
   return (
     <View style={[styles.container, { width: itemWidth, height: itemHeight }]}>
-      {/* Background: real video if available, otherwise animated */}
-      {hasVideo ? (
-        Platform.OS === "web" ? (
-          <video
-            src={wave.image_url}
-            autoPlay={isActive}
-            loop
-            muted
-            playsInline
-            style={{
-              position: "absolute", top: 0, left: 0, width: "100%", height: "100%",
-              objectFit: "cover", zIndex: 0,
-            } as any}
-          />
-        ) : (
-          <Video
-            source={{ uri: wave.image_url }}
-            style={StyleSheet.absoluteFill}
-            resizeMode={ResizeMode.COVER}
-            shouldPlay={isActive}
-            isLooping
-            isMuted
-          />
-        )
+      {/* Background: Video compositor on web, animated bg on native */}
+      {Platform.OS === "web" && videoClips.length > 0 ? (
+        <VideoCompositor
+          clips={videoClips}
+          theme={wave.theme}
+          title={wave.title}
+          orgName={orgName}
+          isActive={isActive}
+          width={itemWidth}
+          height={itemHeight}
+        />
       ) : (
         <AnimatedBackground theme={wave.theme} isActive={isActive} description={wave.description} title={wave.title} />
       )}
@@ -83,13 +76,6 @@ export function WaveFeedItem({
       {isOnline && (
         <View style={[styles.topBadge, { left: undefined, right: 16 }]}>
           <Text style={styles.topBadgeText}>ONLINE</Text>
-        </View>
-      )}
-
-      {/* Generating indicator */}
-      {!hasVideo && (
-        <View style={styles.generatingBadge}>
-          <Text style={styles.generatingText}>動画を生成中...</Text>
         </View>
       )}
 
@@ -157,22 +143,20 @@ export function WaveFeedItem({
 
 const styles = StyleSheet.create({
   container: { backgroundColor: "#000" },
-  tapArea: { ...StyleSheet.absoluteFillObject, zIndex: 1 },
+  tapArea: { ...StyleSheet.absoluteFillObject, zIndex: 5 },
   gradientBottom: {
     position: "absolute", bottom: 0, left: 0, right: 0, height: 350,
-    backgroundColor: "transparent", zIndex: 2,
+    backgroundColor: "transparent", zIndex: 6,
     // @ts-ignore
     backgroundImage: "linear-gradient(transparent, rgba(0,0,0,0.9))",
   },
   gradientTop: {
-    position: "absolute", top: 0, left: 0, right: 0, height: 100, zIndex: 2,
+    position: "absolute", top: 0, left: 0, right: 0, height: 100, zIndex: 6,
     // @ts-ignore
     backgroundImage: "linear-gradient(rgba(0,0,0,0.3), transparent)",
   },
   topBadge: { position: "absolute", top: 52, left: 16, backgroundColor: "rgba(255,255,255,0.12)", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 3, zIndex: 10 },
   topBadgeText: { color: "rgba(255,255,255,0.8)", fontSize: 9, fontWeight: "800", letterSpacing: 1 },
-  generatingBadge: { position: "absolute", top: 52, right: 16, backgroundColor: "rgba(255,255,255,0.08)", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 3, zIndex: 10 },
-  generatingText: { color: "rgba(255,255,255,0.4)", fontSize: 9, fontWeight: "600" },
 
   rightActions: { position: "absolute", right: 10, bottom: 150, alignItems: "center", gap: 18, zIndex: 10 },
   actionItem: { alignItems: "center", gap: 3 },

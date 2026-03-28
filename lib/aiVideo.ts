@@ -119,9 +119,18 @@ function scoreVideo(video: TaggedVideo, keywords: string[]): number {
   return score;
 }
 
+// Returns single best-match video URL
 export async function generateAIVideo(
   theme: string, title: string, description: string,
 ): Promise<string> {
+  const clips = selectClips(theme, title, description);
+  return clips[0];
+}
+
+// Returns 3 content-matched clips for video composition
+export function selectClips(
+  theme: string, title: string, description: string,
+): string[] {
   const text = `${title} ${description} ${theme}`;
   const keywords = tokenize(text);
 
@@ -129,21 +138,31 @@ export async function generateAIVideo(
   const scored = VIDEO_LIBRARY.map((v) => ({
     url: v.url,
     score: scoreVideo(v, keywords),
+    tags: v.tags,
   }));
 
-  // Sort by score descending
   scored.sort((a, b) => b.score - a.score);
 
-  // If good match found (score > 5), use it
-  if (scored[0].score > 5) {
-    // Pick from top 3 for variety
-    const top = scored.slice(0, 3).filter((s) => s.score > 0);
-    const hash = keywords.join("").split("").reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0);
-    return top[Math.abs(hash) % top.length].url;
+  // Pick top 3, ensuring diversity (don't pick videos with same first tag)
+  const selected: string[] = [];
+  const usedPrimaryTags = new Set<string>();
+
+  for (const item of scored) {
+    if (selected.length >= 3) break;
+    const primaryTag = item.tags[0];
+    if (usedPrimaryTags.has(primaryTag) && selected.length > 0) continue;
+    selected.push(item.url);
+    usedPrimaryTags.add(primaryTag);
   }
 
-  // Fallback to theme default
-  const defaults = THEME_DEFAULTS[theme] ?? [V(1310), V(4883), V(3454)];
-  const hash = title.split("").reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0);
-  return defaults[Math.abs(hash) % defaults.length];
+  // Fill remaining slots from theme defaults
+  if (selected.length < 3) {
+    const defaults = THEME_DEFAULTS[theme] ?? [V(1310), V(4883), V(3454)];
+    for (const d of defaults) {
+      if (selected.length >= 3) break;
+      if (!selected.includes(d)) selected.push(d);
+    }
+  }
+
+  return selected;
 }
