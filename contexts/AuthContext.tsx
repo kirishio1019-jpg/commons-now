@@ -27,9 +27,10 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const redirectUri = AuthSession.makeRedirectUri({
-  scheme: "commons-now",
-});
+const redirectUri =
+  Platform.OS === "web"
+    ? window.location.origin
+    : AuthSession.makeRedirectUri({ scheme: "commons-now" });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
