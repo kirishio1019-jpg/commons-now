@@ -47,15 +47,20 @@ export function scoreWaves(
 
     // 4. Proximity (0-15)
     let proximity = 0;
-    const dist = wave.distance_km;
-    if (dist != null) {
-      if (dist <= prefs.distanceComfortKm) {
-        proximity = AI.PROXIMITY_MAX * (1 - dist / Math.max(prefs.distanceComfortKm, 1));
-      } else {
-        proximity = Math.max(0, 5 - (dist - prefs.distanceComfortKm) * 0.2);
-      }
+    const isOnline = wave.location?.is_online === true;
+    if (isOnline) {
+      proximity = 12; // Online events are accessible to everyone
     } else {
-      proximity = 5; // Unknown distance gets neutral
+      const dist = wave.distance_km;
+      if (dist != null) {
+        if (dist <= prefs.distanceComfortKm) {
+          proximity = AI.PROXIMITY_MAX * (1 - dist / Math.max(prefs.distanceComfortKm, 1));
+        } else {
+          proximity = Math.max(0, 5 - (dist - prefs.distanceComfortKm) * 0.2);
+        }
+      } else {
+        proximity = 5;
+      }
     }
 
     // 5. Popularity (0-10)

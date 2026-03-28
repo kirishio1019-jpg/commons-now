@@ -38,6 +38,7 @@ export interface Wave {
     address: string;
     latitude: number;
     longitude: number;
+    is_online?: boolean;
   };
   date: string;
   time_start: string;

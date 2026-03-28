@@ -15,7 +15,7 @@ import { Wave } from "../../types";
 
 function buildLeafletHtml(waves: Wave[]): string {
   const markers = waves
-    .filter((w) => w.location?.latitude && w.location?.longitude)
+    .filter((w) => w.location?.latitude && w.location?.longitude && !w.location?.is_online)
     .map(
       (w) =>
         `L.marker([${w.location.latitude}, ${w.location.longitude}])

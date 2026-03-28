@@ -11,13 +11,12 @@ export function useWaves() {
     setLoading(true);
     setError(null);
 
+    // Fetch all upcoming waves (no hard date filter — AI handles ranking)
     const { data, error: err } = await supabase
       .from("waves")
       .select("*")
-      .gte("date", new Date().toISOString().split("T")[0])
-      .order("is_personalized", { ascending: false })
       .order("date", { ascending: true })
-      .limit(50);
+      .limit(100);
 
     if (err) {
       setError(err.message);

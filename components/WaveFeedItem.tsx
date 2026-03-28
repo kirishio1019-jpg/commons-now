@@ -1,14 +1,10 @@
-import React from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-} from "react-native";
+import React, { useEffect, useState } from "react";
+import { View, Text, StyleSheet, Pressable } from "react-native";
 import { router } from "expo-router";
 import { Wave, CommitLevel } from "../types";
 import { Colors } from "../lib/colors";
 import { AnimatedBackground } from "./AnimatedBackground";
+import { supabase } from "../lib/supabase";
 
 interface WaveFeedItemProps {
   wave: Wave;
@@ -20,63 +16,62 @@ interface WaveFeedItemProps {
   itemWidth: number;
 }
 
-const COMMIT_CONFIG: Record<
-  CommitLevel,
-  { label: string; icon: string; color: string; bg: string }
-> = {
-  none: { label: "興味あり", icon: "+", color: "#fff", bg: "rgba(255,255,255,0.12)" },
-  curious: { label: "検討中", icon: "?", color: Colors.maybe, bg: Colors.curious + "30" },
-  maybe: { label: "参加", icon: "!", color: Colors.going, bg: Colors.maybe + "30" },
-  going: { label: "参加中", icon: "✓", color: Colors.going, bg: Colors.going + "30" },
+const COMMIT_LABELS: Record<CommitLevel, { label: string; icon: string; color: string }> = {
+  none: { label: "興味あり", icon: "+", color: "#fff" },
+  curious: { label: "検討中", icon: "?", color: Colors.maybe },
+  maybe: { label: "参加", icon: "!", color: Colors.going },
+  going: { label: "参加中", icon: "✓", color: Colors.going },
 };
 
 export function WaveFeedItem({
-  wave,
-  clipCaption,
-  isActive,
-  commitLevel,
-  onCommit,
-  itemHeight,
-  itemWidth,
+  wave, clipCaption, isActive, commitLevel, onCommit, itemHeight, itemWidth,
 }: WaveFeedItemProps) {
-  const commit = COMMIT_CONFIG[commitLevel];
+  const commit = COMMIT_LABELS[commitLevel];
+  const [orgName, setOrgName] = useState<string>("");
+
+  // Fetch organizer name
+  useEffect(() => {
+    if (!wave.organizer_id) return;
+    supabase.from("organizations").select("name").eq("id", wave.organizer_id).single()
+      .then(({ data }) => { if (data) setOrgName(data.name); });
+  }, [wave.organizer_id]);
+
+  const isOnline = wave.location?.is_online === true;
+  const dateStr = wave.date;
+  const timeStr = wave.time_start;
 
   return (
     <View style={[styles.container, { width: itemWidth, height: itemHeight }]}>
       <AnimatedBackground theme={wave.theme} isActive={isActive} description={wave.description} title={wave.title} />
-
       <View style={styles.gradientBottom} />
       <View style={styles.gradientTop} />
 
-      <Pressable
-        style={styles.tapArea}
-        onPress={() => router.push(`/wave/${wave.id}`)}
-      />
+      <Pressable style={styles.tapArea} onPress={() => router.push(`/wave/${wave.id}`)} />
 
-      {/* Personalized indicator */}
+      {/* For You badge */}
       {wave.is_personalized && (
         <View style={styles.topBadge}>
-          <Text style={styles.topBadgeText}>For You</Text>
+          <Text style={styles.topBadgeText}>FOR YOU</Text>
+        </View>
+      )}
+
+      {/* Online badge */}
+      {isOnline && (
+        <View style={[styles.topBadge, { left: undefined, right: 16 }]}>
+          <Text style={styles.topBadgeText}>ONLINE</Text>
         </View>
       )}
 
       {/* Right side actions */}
       <View style={styles.rightActions}>
         <Pressable style={styles.actionItem} onPress={onCommit}>
-          <View style={[styles.actionCircle, { backgroundColor: commit.bg }]}>
-            <Text style={[styles.actionIcon, commitLevel !== "none" && { color: commit.color }]}>
-              {commit.icon}
-            </Text>
+          <View style={[styles.actionCircle, commitLevel !== "none" && { borderColor: commit.color + "60", backgroundColor: commit.color + "15" }]}>
+            <Text style={[styles.actionIcon, commitLevel !== "none" && { color: commit.color }]}>{commit.icon}</Text>
           </View>
-          <Text style={[styles.actionLabel, commitLevel !== "none" && { color: commit.color }]}>
-            {commit.label}
-          </Text>
+          <Text style={[styles.actionLabel, commitLevel !== "none" && { color: commit.color }]}>{commit.label}</Text>
         </Pressable>
 
-        <Pressable
-          style={styles.actionItem}
-          onPress={() => router.push(`/wave/${wave.id}`)}
-        >
+        <Pressable style={styles.actionItem} onPress={() => router.push(`/wave/${wave.id}`)}>
           <View style={styles.actionCircle}>
             <Text style={styles.actionIcon}>{wave.current_participants}</Text>
           </View>
@@ -91,50 +86,51 @@ export function WaveFeedItem({
         </Pressable>
       </View>
 
-      {/* Bottom overlay */}
+      {/* Bottom content — organizer first, then title */}
       <View style={styles.bottomOverlay}>
-        {clipCaption && (
-          <Text style={styles.clipCaption}>"{clipCaption}"</Text>
-        )}
+        {clipCaption && <Text style={styles.clipCaption}>"{clipCaption}"</Text>}
 
-        <Text style={styles.waveTitle} numberOfLines={2}>
-          {wave.title}
-        </Text>
+        {/* Organizer name — prominent */}
+        {orgName ? (
+          <Pressable onPress={() => router.push(`/org/${wave.organizer_id}`)}>
+            <Text style={styles.orgName}>@{orgName}</Text>
+          </Pressable>
+        ) : null}
 
+        {/* Title — below organizer */}
+        <Text style={styles.waveTitle} numberOfLines={2}>{wave.title}</Text>
+
+        {/* Meta line */}
         <View style={styles.metaRow}>
-          {wave.distance_km != null && (
-            <Text style={styles.metaText}>{wave.distance_km}km</Text>
+          <Text style={styles.metaText}>{dateStr}</Text>
+          <Text style={styles.metaDot}>·</Text>
+          <Text style={styles.metaText}>{timeStr}</Text>
+          {!isOnline && wave.distance_km != null && (
+            <>
+              <Text style={styles.metaDot}>·</Text>
+              <Text style={styles.metaText}>{wave.distance_km}km</Text>
+            </>
           )}
-          <Text style={styles.metaDot}>·</Text>
-          <Text style={styles.metaText}>{wave.date}</Text>
-          <Text style={styles.metaDot}>·</Text>
-          <Text style={styles.metaText}>{wave.time_start}</Text>
+          {isOnline && (
+            <>
+              <Text style={styles.metaDot}>·</Text>
+              <Text style={styles.metaText}>オンライン</Text>
+            </>
+          )}
         </View>
 
-        <View style={styles.themeRow}>
-          <View style={styles.themeTag}>
-            <Text style={styles.themeText}>#{wave.theme}</Text>
-          </View>
+        {/* Tags */}
+        <View style={styles.tagRow}>
+          <View style={styles.tag}><Text style={styles.tagText}>#{wave.theme}</Text></View>
           {wave.eco_impact_target.trees_planted > 0 && (
-            <View style={styles.themeTag}>
-              <Text style={styles.themeText}>{wave.eco_impact_target.trees_planted}本植樹</Text>
-            </View>
+            <View style={styles.tag}><Text style={styles.tagText}>{wave.eco_impact_target.trees_planted}本植樹</Text></View>
           )}
           {wave.eco_impact_target.meals_shared > 0 && (
-            <View style={styles.themeTag}>
-              <Text style={styles.themeText}>{wave.eco_impact_target.meals_shared}食共有</Text>
-            </View>
-          )}
-          {wave.eco_impact_target.water_collected_liters > 0 && (
-            <View style={styles.themeTag}>
-              <Text style={styles.themeText}>{wave.eco_impact_target.water_collected_liters}L雨水</Text>
-            </View>
+            <View style={styles.tag}><Text style={styles.tagText}>{wave.eco_impact_target.meals_shared}食共有</Text></View>
           )}
         </View>
 
-        <Text style={styles.description} numberOfLines={1}>
-          {wave.description}
-        </Text>
+        <Text style={styles.desc} numberOfLines={1}>{wave.description}</Text>
       </View>
     </View>
   );
@@ -144,51 +140,47 @@ const styles = StyleSheet.create({
   container: { backgroundColor: "#000" },
   tapArea: { ...StyleSheet.absoluteFillObject, zIndex: 1 },
   gradientBottom: {
-    position: "absolute", bottom: 0, left: 0, right: 0, height: 320,
+    position: "absolute", bottom: 0, left: 0, right: 0, height: 350,
     backgroundColor: "transparent", zIndex: 2,
     // @ts-ignore
-    backgroundImage: "linear-gradient(transparent, rgba(0,0,0,0.85))",
+    backgroundImage: "linear-gradient(transparent, rgba(0,0,0,0.9))",
   },
   gradientTop: {
-    position: "absolute", top: 0, left: 0, right: 0, height: 100,
-    zIndex: 2,
+    position: "absolute", top: 0, left: 0, right: 0, height: 100, zIndex: 2,
     // @ts-ignore
     backgroundImage: "linear-gradient(rgba(0,0,0,0.3), transparent)",
   },
-  topBadge: {
-    position: "absolute", top: 54, left: 16,
-    backgroundColor: "rgba(255,255,255,0.15)", paddingHorizontal: 10, paddingVertical: 4,
-    borderRadius: 4, zIndex: 10,
+  topBadge: { position: "absolute", top: 52, left: 16, backgroundColor: "rgba(255,255,255,0.12)", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 3, zIndex: 10 },
+  topBadgeText: { color: "rgba(255,255,255,0.8)", fontSize: 9, fontWeight: "800", letterSpacing: 1 },
+
+  rightActions: { position: "absolute", right: 10, bottom: 150, alignItems: "center", gap: 18, zIndex: 10 },
+  actionItem: { alignItems: "center", gap: 3 },
+  actionCircle: { width: 42, height: 42, borderRadius: 21, backgroundColor: "rgba(255,255,255,0.08)", justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.12)" },
+  actionIcon: { color: "rgba(255,255,255,0.9)", fontSize: 15, fontWeight: "700" },
+  actionLabel: { color: "rgba(255,255,255,0.6)", fontSize: 9, fontWeight: "600" },
+
+  bottomOverlay: { position: "absolute", bottom: 82, left: 16, right: 64, gap: 5, zIndex: 10 },
+  clipCaption: { color: "rgba(255,255,255,0.8)", fontSize: 14, fontWeight: "300", fontStyle: "italic", lineHeight: 19 },
+
+  // Organizer — large and prominent
+  orgName: {
+    color: "#fff", fontSize: 20, fontWeight: "800", letterSpacing: -0.5,
+    textShadowColor: "rgba(0,0,0,0.7)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
   },
-  topBadgeText: { color: "rgba(255,255,255,0.9)", fontSize: 11, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" },
-  rightActions: { position: "absolute", right: 10, bottom: 150, alignItems: "center", gap: 20, zIndex: 10 },
-  actionItem: { alignItems: "center", gap: 4 },
-  actionCircle: {
-    width: 42, height: 42, borderRadius: 21,
-    backgroundColor: "rgba(255,255,255,0.1)", justifyContent: "center", alignItems: "center",
-    borderWidth: 1, borderColor: "rgba(255,255,255,0.15)",
-  },
-  actionIcon: { color: "rgba(255,255,255,0.9)", fontSize: 16, fontWeight: "700" },
-  actionLabel: {
-    color: "rgba(255,255,255,0.7)", fontSize: 10, fontWeight: "600",
-    textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
-  },
-  bottomOverlay: { position: "absolute", bottom: 88, left: 16, right: 66, gap: 6, zIndex: 10 },
-  clipCaption: {
-    color: "rgba(255,255,255,0.85)", fontSize: 15, fontWeight: "300", fontStyle: "italic", lineHeight: 20,
-    textShadowColor: "rgba(0,0,0,0.6)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
-  },
+
+  // Title — smaller, below org
   waveTitle: {
-    color: "#fff", fontSize: 17, fontWeight: "700", lineHeight: 22, letterSpacing: -0.3,
+    color: "rgba(255,255,255,0.9)", fontSize: 14, fontWeight: "600", lineHeight: 19,
     textShadowColor: "rgba(0,0,0,0.6)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
+
   metaRow: { flexDirection: "row", alignItems: "center", gap: 4 },
-  metaText: { color: "rgba(255,255,255,0.7)", fontSize: 12, fontWeight: "500" },
-  metaDot: { color: "rgba(255,255,255,0.4)", fontSize: 12 },
-  themeRow: { flexDirection: "row", flexWrap: "wrap", gap: 4 },
-  themeTag: {
-    backgroundColor: "rgba(255,255,255,0.1)", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4,
-  },
-  themeText: { color: "rgba(255,255,255,0.8)", fontSize: 11, fontWeight: "600" },
-  description: { color: "rgba(255,255,255,0.45)", fontSize: 12, fontWeight: "400", marginTop: 2 },
+  metaText: { color: "rgba(255,255,255,0.6)", fontSize: 11, fontWeight: "500" },
+  metaDot: { color: "rgba(255,255,255,0.3)" },
+
+  tagRow: { flexDirection: "row", flexWrap: "wrap", gap: 4 },
+  tag: { backgroundColor: "rgba(255,255,255,0.08)", paddingHorizontal: 7, paddingVertical: 2, borderRadius: 3 },
+  tagText: { color: "rgba(255,255,255,0.7)", fontSize: 10, fontWeight: "600" },
+
+  desc: { color: "rgba(255,255,255,0.35)", fontSize: 11, marginTop: 2 },
 });

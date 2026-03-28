@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   FlatList,
-  Platform,
   Pressable,
   ViewToken,
   LayoutChangeEvent,
@@ -27,14 +26,13 @@ export default function FeedScreen() {
   const { clips } = useClips();
   const { commitments } = useCommitments();
   const [activeIndex, setActiveIndex] = useState(0);
-  const [activeTab, setActiveTab] = useState<"today" | "week">("today");
   const [layoutSize, setLayoutSize] = useState({ width: 390, height: 844 });
   const flatListRef = useRef<FlatList>(null);
 
   const itemHeight = layoutSize.height;
   const itemWidth = layoutSize.width;
 
-  // AI-powered personalized feed (8-signal scoring + collaborative + bandit)
+  // AI-powered personalized feed
   const { rankedWaves } = useAIFeed(waves, commitments, user);
 
   const feedData = useMemo(() => {
@@ -44,7 +42,6 @@ export default function FeedScreen() {
     });
   }, [rankedWaves, clips]);
 
-  // Track dwell time per wave
   const dwellStartRef = useRef<Record<string, number>>({});
 
   const onLayout = useCallback((e: LayoutChangeEvent) => {
@@ -55,19 +52,16 @@ export default function FeedScreen() {
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
       if (viewableItems.length > 0 && viewableItems[0].index != null) {
-        const newIndex = viewableItems[0].index;
-        setActiveIndex(newIndex);
+        setActiveIndex(viewableItems[0].index);
 
-        // Track impressions for newly visible waves
         for (const item of viewableItems) {
           const wave = feedData[item.index ?? 0]?.wave;
           if (wave) {
-            eventTracker.trackImpression(wave.id, item.index ?? 0, activeTab);
+            eventTracker.trackImpression(wave.id, item.index ?? 0, "ai_feed");
             dwellStartRef.current[wave.id] = Date.now();
           }
         }
 
-        // Track dwell for waves that left viewport
         const visibleIds = new Set(viewableItems.map((v) => feedData[v.index ?? 0]?.wave?.id));
         for (const [waveId, startTime] of Object.entries(dwellStartRef.current)) {
           if (!visibleIds.has(waveId)) {
@@ -77,12 +71,10 @@ export default function FeedScreen() {
         }
       }
     },
-    [feedData, activeTab]
+    [feedData]
   );
 
-  const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 60,
-  }).current;
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
 
   const handleCommit = useCallback(
     (waveId: string) => {
@@ -98,30 +90,20 @@ export default function FeedScreen() {
 
   if (wavesLoading) {
     return (
-      <View style={[styles.container, styles.loadingContainer]}>
+      <View style={[styles.container, styles.center]}>
         <ActivityIndicator size="large" color="#fff" />
-        <Text style={styles.loadingText}>波を読み込み中...</Text>
       </View>
     );
   }
 
   if (feedData.length === 0) {
     return (
-      <View style={[styles.container, styles.loadingContainer]}>
-        <Text style={{ color: "rgba(255,255,255,0.2)", fontSize: 48, fontWeight: "200" }}>W</Text>
-        <Text style={[styles.loadingText, { fontSize: 16, fontWeight: "700", marginTop: 12 }]}>
-          まだ波がありません
-        </Text>
-        <Text style={[styles.loadingText, { marginTop: 4, color: "rgba(255,255,255,0.5)" }]}>
-          最初の波を起こしてみましょう
-        </Text>
-        <Pressable
-          style={{ marginTop: 20, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8, backgroundColor: "#fff" }}
-          onPress={() => router.push("/wave/create")}
-        >
-          <Text style={{ color: "#000", fontSize: 14, fontWeight: "700" }}>
-            波を作成
-          </Text>
+      <View style={[styles.container, styles.center]}>
+        <Text style={styles.emptyLetter}>C</Text>
+        <Text style={styles.emptyTitle}>まだ波がありません</Text>
+        <Text style={styles.emptySub}>最初の波を起こしてみましょう</Text>
+        <Pressable style={styles.emptyButton} onPress={() => router.push("/wave/create")}>
+          <Text style={styles.emptyButtonText}>波を作成</Text>
         </Pressable>
       </View>
     );
@@ -129,34 +111,9 @@ export default function FeedScreen() {
 
   return (
     <View style={styles.container} onLayout={onLayout}>
-      {/* Floating tab switcher */}
-      <View style={styles.tabRow}>
-        <Pressable
-          style={[styles.tab, activeTab === "today" && styles.tabActive]}
-          onPress={() => setActiveTab("today")}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "today" && styles.tabTextActive,
-            ]}
-          >
-            今日の波
-          </Text>
-        </Pressable>
-        <Pressable
-          style={[styles.tab, activeTab === "week" && styles.tabActive]}
-          onPress={() => setActiveTab("week")}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "week" && styles.tabTextActive,
-            ]}
-          >
-            今週の波
-          </Text>
-        </Pressable>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Commons Now</Text>
       </View>
 
       {/* Create button */}
@@ -200,67 +157,25 @@ export default function FeedScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#000",
+  container: { flex: 1, backgroundColor: "#000" },
+  center: { justifyContent: "center", alignItems: "center" },
+  header: {
+    position: "absolute", top: 46, left: 16, zIndex: 100,
   },
-  loadingContainer: {
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  loadingText: {
-    color: "#fff",
-    fontSize: 14,
-    marginTop: 12,
-  },
-  tabRow: {
-    position: "absolute",
-    top: 45,
-    left: 0,
-    right: 0,
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 12,
-    zIndex: 100,
-  },
-  tab: {
-    paddingHorizontal: 18,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.12)",
-  },
-  tabActive: {
-    backgroundColor: "rgba(255,255,255,0.25)",
-  },
-  tabText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "rgba(255,255,255,0.6)",
-  },
-  tabTextActive: {
-    color: "#fff",
+  headerTitle: {
+    color: "rgba(255,255,255,0.9)", fontSize: 16, fontWeight: "800", letterSpacing: -0.3,
+    textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   fab: {
-    position: "absolute",
-    bottom: 70,
-    right: 14,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "#fff",
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 200,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 6,
+    position: "absolute", bottom: 70, right: 14,
+    width: 44, height: 44, borderRadius: 22, backgroundColor: "#fff",
+    justifyContent: "center", alignItems: "center", zIndex: 200,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 6,
   },
-  fabText: {
-    color: "#000",
-    fontSize: 24,
-    fontWeight: "300",
-    lineHeight: 26,
-  },
+  fabText: { color: "#000", fontSize: 24, fontWeight: "300", lineHeight: 26 },
+  emptyLetter: { color: "rgba(255,255,255,0.15)", fontSize: 48, fontWeight: "200" },
+  emptyTitle: { color: "#fff", fontSize: 16, fontWeight: "700", marginTop: 12 },
+  emptySub: { color: "rgba(255,255,255,0.5)", fontSize: 13, marginTop: 4 },
+  emptyButton: { marginTop: 20, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8, backgroundColor: "#fff" },
+  emptyButtonText: { color: "#000", fontSize: 14, fontWeight: "700" },
 });
