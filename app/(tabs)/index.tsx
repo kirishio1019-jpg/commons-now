@@ -43,36 +43,41 @@ export default function FeedScreen() {
   }, [rankedWaves, clips]);
 
   const dwellStartRef = useRef<Record<string, number>>({});
+  const feedDataRef = useRef(feedData);
+  feedDataRef.current = feedData;
 
   const onLayout = useCallback((e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
     setLayoutSize({ width, height });
   }, []);
 
-  const onViewableItemsChanged = useCallback(
+  // IMPORTANT: onViewableItemsChanged must be stable (never change reference)
+  // Otherwise FlatList throws "Changing onViewableItemsChanged on the fly is not supported"
+  const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
       if (viewableItems.length > 0 && viewableItems[0].index != null) {
         setActiveIndex(viewableItems[0].index);
 
         for (const item of viewableItems) {
-          const wave = feedData[item.index ?? 0]?.wave;
+          const wave = feedDataRef.current[item.index ?? 0]?.wave;
           if (wave) {
-            eventTracker.trackImpression(wave.id, item.index ?? 0, "ai_feed");
+            try { eventTracker.trackImpression(wave.id, item.index ?? 0, "ai_feed"); } catch {}
             dwellStartRef.current[wave.id] = Date.now();
           }
         }
 
-        const visibleIds = new Set(viewableItems.map((v) => feedData[v.index ?? 0]?.wave?.id));
+        const visibleIds = new Set(
+          viewableItems.map((v) => feedDataRef.current[v.index ?? 0]?.wave?.id)
+        );
         for (const [waveId, startTime] of Object.entries(dwellStartRef.current)) {
           if (!visibleIds.has(waveId)) {
-            eventTracker.trackDwell(waveId, Date.now() - startTime);
+            try { eventTracker.trackDwell(waveId, Date.now() - startTime); } catch {}
             delete dwellStartRef.current[waveId];
           }
         }
       }
-    },
-    [feedData]
-  );
+    }
+  ).current;
 
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
 
