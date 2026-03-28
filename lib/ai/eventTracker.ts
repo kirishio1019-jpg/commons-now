@@ -132,10 +132,14 @@ class EventTracker {
         payload: e.payload,
         created_at: e.created_at,
       }));
-      await supabase.from("user_events").insert(rows);
+      const { error } = await supabase.from("user_events").insert(rows);
+      if (error) {
+        // Table may not exist yet — silently keep events local
+        this.queue.unshift(...batch);
+        return;
+      }
       await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(this.queue));
     } catch {
-      // Re-add failed batch
       this.queue.unshift(...batch);
     }
   }

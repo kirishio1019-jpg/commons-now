@@ -46,13 +46,17 @@ export default function MyPageScreen() {
   const [aiPrefs, setAiPrefs] = useState<UserPreferenceVector | null>(null);
   const [insights, setInsights] = useState<string[]>([]);
 
-  // Load AI insights
+  // Load AI insights (graceful if AI tables not ready)
   useEffect(() => {
     if (!user) return;
     (async () => {
-      const p = await loadPreferences(user.id) ?? buildInitialPreferences(user);
-      setAiPrefs(p);
-      setInsights(generateInsights(p, commitments, waves));
+      try {
+        const p = await loadPreferences(user.id) ?? buildInitialPreferences(user);
+        setAiPrefs(p);
+        setInsights(generateInsights(p, commitments, waves));
+      } catch {
+        setInsights([]);
+      }
     })();
   }, [user?.id, commitments.length, waves.length]);
 

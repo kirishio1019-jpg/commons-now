@@ -85,14 +85,17 @@ function AuthGate() {
     } else if (session && inAuthScreen) {
       router.replace("/(tabs)");
     }
+  }, [session, loading, segments]);
 
-    // Initialize AI event tracker
-    if (session?.user?.id) {
+  // Initialize AI event tracker (separate effect, only on session change)
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    try {
       eventTracker.init(session.user.id);
       eventTracker.trackSessionStart();
-      return () => eventTracker.destroy();
-    }
-  }, [session, loading, segments]);
+    } catch {}
+    return () => { try { eventTracker.destroy(); } catch {} };
+  }, [session?.user?.id]);
 
   if (loading) {
     return (

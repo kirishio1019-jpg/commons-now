@@ -23,27 +23,30 @@ export function useAIFeed(
   const [aggregates, setAggregates] = useState<any[]>([]);
   const initDone = useRef(false);
 
-  // Load preferences on mount
+  // Load preferences on mount (graceful fallback if AI tables don't exist yet)
   useEffect(() => {
     if (!user || initDone.current) return;
     initDone.current = true;
 
     (async () => {
-      let loaded = await loadPreferences(user.id);
-      if (!loaded) {
-        loaded = buildInitialPreferences(user);
-        await savePreferences(user.id, loaded);
+      try {
+        let loaded = await loadPreferences(user.id);
+        if (!loaded) {
+          loaded = buildInitialPreferences(user);
+          try { await savePreferences(user.id, loaded); } catch {}
+        }
+        setPrefs(loaded);
+      } catch {
+        setPrefs(buildInitialPreferences(user));
       }
-      setPrefs(loaded);
     })();
 
-    // Load wave aggregates
+    // Load wave aggregates (may not exist yet)
     supabase
       .from("wave_interaction_aggregates")
       .select("*")
-      .then(({ data }) => {
-        if (data) setAggregates(data);
-      });
+      .then(({ data }) => { if (data) setAggregates(data); })
+      .catch(() => {});
   }, [user?.id]);
 
   // Periodically update preferences from accumulated events
