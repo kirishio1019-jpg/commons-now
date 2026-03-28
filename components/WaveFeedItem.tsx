@@ -47,6 +47,7 @@ export function WaveFeedItem({
           theme={wave.theme}
           title={wave.title}
           description={wave.description}
+          imageUrl={wave.image_url}
           isActive={isActive}
           width={itemWidth}
           height={itemHeight}

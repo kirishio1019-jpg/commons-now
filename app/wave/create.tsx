@@ -106,7 +106,8 @@ export default function CreateWaveScreen() {
     locationValid &&
     date.length > 0 &&
     timeStart.length > 0 &&
-    capacity.length > 0;
+    capacity.length > 0 &&
+    media !== null;
 
   const handleSelectMedia = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -152,11 +153,11 @@ export default function CreateWaveScreen() {
       }).select("id").single();
       if (waveErr) throw waveErr;
 
-      // Upload user clip if attached
+      // Upload media and set as wave cover
       if (media && wave) {
         try {
           const fileExt = media.uri.split(".").pop() ?? "mp4";
-          const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+          const fileName = `covers/${wave.id}.${fileExt}`;
           const response = await globalThis.fetch(media.uri);
           const blob = await response.blob();
           const { error: uploadErr } = await supabase.storage.from("clips").upload(fileName, blob, {
@@ -164,6 +165,9 @@ export default function CreateWaveScreen() {
           });
           if (!uploadErr) {
             const { data: { publicUrl } } = supabase.storage.from("clips").getPublicUrl(fileName);
+            // Set as wave cover image
+            await supabase.from("waves").update({ image_url: publicUrl }).eq("id", wave.id);
+            // Also save as clip
             await supabase.from("clips").insert({
               wave_id: wave.id, user_id: user.id, media_url: publicUrl, thumbnail_url: publicUrl,
               caption: clipCaption || "", duration_sec: media.duration ? Math.min(Math.round(media.duration / 1000), 15) : 0,
@@ -314,7 +318,7 @@ export default function CreateWaveScreen() {
       <TextInput style={s.input} value={capacity} onChangeText={(t) => setCapacity(t.replace(/[^0-9]/g, ""))} placeholder="10" placeholderTextColor={Colors.textLight} keyboardType="number-pad" />
 
       {/* Clip */}
-      <Text style={s.label}>クリップ（任意）</Text>
+      <Text style={s.label}>カバー動画・画像（必須）</Text>
       {media ? (
         <View style={s.mediaPreview}>
           {media.type === "image" ? (
