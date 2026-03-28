@@ -122,6 +122,10 @@ function AuthGate() {
         name="org/[id]"
         options={{ title: "団体情報", presentation: "card" }}
       />
+      <Stack.Screen
+        name="user/[id]"
+        options={{ title: "プロフィール", presentation: "card" }}
+      />
       <Stack.Screen name="settings" options={{ title: "設定" }} />
       <Stack.Screen
         name="organizer/index"

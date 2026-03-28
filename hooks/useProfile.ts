@@ -44,6 +44,7 @@ export function useProfile() {
             tags: [],
             isolation_score: 50,
             is_onboarded: false,
+            is_public: false,
             ai_companion_heavy_user: false,
           })
           .select()

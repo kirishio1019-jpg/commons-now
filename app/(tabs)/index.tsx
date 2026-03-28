@@ -87,25 +87,19 @@ export default function FeedScreen() {
   if (feedData.length === 0) {
     return (
       <View style={[styles.container, styles.loadingContainer]}>
-        <Text style={{ fontSize: 48 }}>🌊</Text>
-        <Text style={[styles.loadingText, { fontSize: 18, fontWeight: "700", marginTop: 16 }]}>
+        <Text style={{ color: "rgba(255,255,255,0.2)", fontSize: 48, fontWeight: "200" }}>W</Text>
+        <Text style={[styles.loadingText, { fontSize: 16, fontWeight: "700", marginTop: 12 }]}>
           まだ波がありません
         </Text>
-        <Text style={[styles.loadingText, { marginTop: 4 }]}>
-          最初の波を起こしてみよう
+        <Text style={[styles.loadingText, { marginTop: 4, color: "rgba(255,255,255,0.5)" }]}>
+          最初の波を起こしてみましょう
         </Text>
         <Pressable
-          style={{
-            marginTop: 20,
-            paddingHorizontal: 24,
-            paddingVertical: 12,
-            borderRadius: 24,
-            backgroundColor: Colors.primary,
-          }}
+          style={{ marginTop: 20, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8, backgroundColor: "#fff" }}
           onPress={() => router.push("/wave/create")}
         >
-          <Text style={{ color: "#fff", fontSize: 15, fontWeight: "700" }}>
-            ＋ 波を起こす
+          <Text style={{ color: "#000", fontSize: 14, fontWeight: "700" }}>
+            波を作成
           </Text>
         </Pressable>
       </View>
@@ -144,15 +138,9 @@ export default function FeedScreen() {
         </Pressable>
       </View>
 
-      {/* FAB - TikTok style create button */}
-      <Pressable
-        style={styles.fab}
-        onPress={() => router.push("/wave/create")}
-      >
-        <View style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 24, backgroundColor: "#00F2EA", borderRadius: 8 }} />
-        <View style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 24, backgroundColor: "#FF0050", borderRadius: 8 }} />
-        <View style={{ position: "absolute", left: 4, right: 4, top: 0, bottom: 0, backgroundColor: "#fff", borderRadius: 6 }} />
-        <Text style={[styles.fabText, { color: "#000" }]}>＋</Text>
+      {/* Create button */}
+      <Pressable style={styles.fab} onPress={() => router.push("/wave/create")}>
+        <Text style={styles.fabText}>+</Text>
       </Pressable>
 
       <FlatList
@@ -233,24 +221,25 @@ const styles = StyleSheet.create({
   },
   fab: {
     position: "absolute",
-    bottom: 74,
-    alignSelf: "center",
-    left: "50%",
-    marginLeft: -24,
-    width: 48,
-    height: 32,
-    borderRadius: 8,
+    bottom: 70,
+    right: 14,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#fff",
     justifyContent: "center",
     alignItems: "center",
     zIndex: 200,
-    overflow: "hidden",
-    flexDirection: "row",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 6,
   },
   fabText: {
-    color: "#fff",
-    fontSize: 22,
-    fontWeight: "800",
-    lineHeight: 24,
-    zIndex: 2,
+    color: "#000",
+    fontSize: 24,
+    fontWeight: "300",
+    lineHeight: 26,
   },
 });

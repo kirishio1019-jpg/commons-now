@@ -19,7 +19,7 @@ export default function AuthScreen() {
       style={styles.container}
     >
       <View style={styles.content}>
-        <Text style={styles.logo}>🌊</Text>
+        <Text style={styles.logo}>C</Text>
         <Text style={styles.title}>Commons Now</Text>
         <Text style={styles.subtitle}>
           地域の波に乗ろう。{"\n"}小さな行動が、大きなうねりになる。
@@ -30,7 +30,7 @@ export default function AuthScreen() {
             style={[styles.button, styles.googleButton]}
             onPress={signInWithGoogle}
           >
-            <Text style={styles.googleIcon}>G</Text>
+            <Text style={[styles.googleIcon, { fontWeight: "700" }]}>G</Text>
             <Text style={styles.googleText}>Googleでログイン</Text>
           </TouchableOpacity>
 
@@ -64,7 +64,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   logo: {
-    fontSize: 64,
+    fontSize: 48,
+    fontWeight: "200",
+    color: "rgba(255,255,255,0.3)",
     marginBottom: 16,
   },
   title: {

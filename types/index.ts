@@ -23,6 +23,7 @@ export interface User {
   age_range?: string;
   bio?: string;
   is_onboarded: boolean;
+  is_public: boolean;
   ai_companion_heavy_user: boolean;
   created_at: string;
 }

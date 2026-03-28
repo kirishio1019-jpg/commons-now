@@ -7,10 +7,8 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { Wave, CommitLevel } from "../types";
-import { getOrgForWave } from "../data/mock";
 import { Colors } from "../lib/colors";
 import { AnimatedBackground } from "./AnimatedBackground";
-import { TrustBadge } from "./TrustBadge";
 
 interface WaveFeedItemProps {
   wave: Wave;
@@ -24,12 +22,12 @@ interface WaveFeedItemProps {
 
 const COMMIT_CONFIG: Record<
   CommitLevel,
-  { label: string; emoji: string; color: string; bg: string }
+  { label: string; icon: string; color: string; bg: string }
 > = {
-  none: { label: "気になる", emoji: "👀", color: "#fff", bg: "rgba(255,255,255,0.12)" },
-  curious: { label: "たぶん", emoji: "🤔", color: Colors.maybe, bg: Colors.curious + "40" },
-  maybe: { label: "行く！", emoji: "🙌", color: Colors.going, bg: Colors.maybe + "40" },
-  going: { label: "参加中", emoji: "✅", color: Colors.going, bg: Colors.going + "40" },
+  none: { label: "興味あり", icon: "+", color: "#fff", bg: "rgba(255,255,255,0.12)" },
+  curious: { label: "検討中", icon: "?", color: Colors.maybe, bg: Colors.curious + "30" },
+  maybe: { label: "参加", icon: "!", color: Colors.going, bg: Colors.maybe + "30" },
+  going: { label: "参加中", icon: "✓", color: Colors.going, bg: Colors.going + "30" },
 };
 
 export function WaveFeedItem({
@@ -41,72 +39,53 @@ export function WaveFeedItem({
   itemHeight,
   itemWidth,
 }: WaveFeedItemProps) {
-  const org = getOrgForWave(wave);
   const commit = COMMIT_CONFIG[commitLevel];
 
   return (
     <View style={[styles.container, { width: itemWidth, height: itemHeight }]}>
-      {/* Animated background - auto-generated from content */}
       <AnimatedBackground theme={wave.theme} isActive={isActive} description={wave.description} />
 
-      {/* Bottom gradient overlay for readability */}
       <View style={styles.gradientBottom} />
       <View style={styles.gradientTop} />
 
-      {/* Tap to open detail */}
       <Pressable
         style={styles.tapArea}
         onPress={() => router.push(`/wave/${wave.id}`)}
       />
 
-      {/* Top: Personalized badge */}
+      {/* Personalized indicator */}
       {wave.is_personalized && (
         <View style={styles.topBadge}>
-          <Text style={styles.topBadgeText}>✨ あなた向け</Text>
+          <Text style={styles.topBadgeText}>For You</Text>
         </View>
       )}
 
-      {/* Right side actions (TikTok style) */}
+      {/* Right side actions */}
       <View style={styles.rightActions}>
-        {/* Org avatar */}
-        {org && (
-          <Pressable
-            style={styles.actionItem}
-            onPress={() => router.push(`/org/${org.id}`)}
-          >
-            <View style={styles.orgAvatar}>
-              <Text style={styles.orgAvatarText}>{org.name[0]}</Text>
-            </View>
-          </Pressable>
-        )}
-
-        {/* Commit button */}
         <Pressable style={styles.actionItem} onPress={onCommit}>
           <View style={[styles.actionCircle, { backgroundColor: commit.bg }]}>
-            <Text style={styles.actionEmoji}>{commit.emoji}</Text>
+            <Text style={[styles.actionIcon, commitLevel !== "none" && { color: commit.color }]}>
+              {commit.icon}
+            </Text>
           </View>
           <Text style={[styles.actionLabel, commitLevel !== "none" && { color: commit.color }]}>
             {commit.label}
           </Text>
         </Pressable>
 
-        {/* Participants */}
         <Pressable
           style={styles.actionItem}
           onPress={() => router.push(`/wave/${wave.id}`)}
         >
           <View style={styles.actionCircle}>
-            <Text style={styles.actionEmoji}>👥</Text>
+            <Text style={styles.actionIcon}>{wave.current_participants}</Text>
           </View>
-          <Text style={styles.actionLabel}>
-            {wave.current_participants}
-          </Text>
+          <Text style={styles.actionLabel}>参加者</Text>
         </Pressable>
 
-        {/* Share */}
         <Pressable style={styles.actionItem}>
           <View style={styles.actionCircle}>
-            <Text style={styles.actionEmoji}>↗</Text>
+            <Text style={styles.actionIcon}>→</Text>
           </View>
           <Text style={styles.actionLabel}>共有</Text>
         </Pressable>
@@ -114,72 +93,47 @@ export function WaveFeedItem({
 
       {/* Bottom overlay */}
       <View style={styles.bottomOverlay}>
-        {/* Clip caption */}
         {clipCaption && (
-          <Text style={styles.clipCaption}>「{clipCaption}」</Text>
+          <Text style={styles.clipCaption}>"{clipCaption}"</Text>
         )}
 
-        {/* Wave title */}
         <Text style={styles.waveTitle} numberOfLines={2}>
           {wave.title}
         </Text>
 
-        {/* Meta chips */}
         <View style={styles.metaRow}>
           {wave.distance_km != null && (
-            <View style={styles.metaChip}>
-              <Text style={styles.metaText}>📍 {wave.distance_km}km</Text>
-            </View>
+            <Text style={styles.metaText}>{wave.distance_km}km</Text>
           )}
-          <View style={styles.metaChip}>
-            <Text style={styles.metaText}>📅 {wave.date}</Text>
-          </View>
-          <View style={styles.metaChip}>
-            <Text style={styles.metaText}>{wave.time_start}〜</Text>
-          </View>
+          <Text style={styles.metaDot}>·</Text>
+          <Text style={styles.metaText}>{wave.date}</Text>
+          <Text style={styles.metaDot}>·</Text>
+          <Text style={styles.metaText}>{wave.time_start}</Text>
         </View>
 
-        {/* Org info */}
-        {org && (
-          <View style={styles.orgRow}>
-            <Text style={styles.orgName}>@{org.name}</Text>
-            <TrustBadge rank={org.trust_rank} size="small" />
-          </View>
-        )}
-
-        {/* Theme tags */}
         <View style={styles.themeRow}>
           <View style={styles.themeTag}>
             <Text style={styles.themeText}>#{wave.theme}</Text>
           </View>
           {wave.eco_impact_target.trees_planted > 0 && (
             <View style={styles.themeTag}>
-              <Text style={styles.themeText}>
-                🌳{wave.eco_impact_target.trees_planted}本
-              </Text>
+              <Text style={styles.themeText}>{wave.eco_impact_target.trees_planted}本植樹</Text>
             </View>
           )}
           {wave.eco_impact_target.meals_shared > 0 && (
             <View style={styles.themeTag}>
-              <Text style={styles.themeText}>
-                🍽️{wave.eco_impact_target.meals_shared}食
-              </Text>
+              <Text style={styles.themeText}>{wave.eco_impact_target.meals_shared}食共有</Text>
             </View>
           )}
           {wave.eco_impact_target.water_collected_liters > 0 && (
             <View style={styles.themeTag}>
-              <Text style={styles.themeText}>
-                💧{wave.eco_impact_target.water_collected_liters}L
-              </Text>
+              <Text style={styles.themeText}>{wave.eco_impact_target.water_collected_liters}L雨水</Text>
             </View>
           )}
         </View>
-      </View>
 
-      {/* Scrolling marquee-style text at very bottom */}
-      <View style={styles.marquee}>
-        <Text style={styles.marqueeText} numberOfLines={1}>
-          🌊 {wave.description}
+        <Text style={styles.description} numberOfLines={1}>
+          {wave.description}
         </Text>
       </View>
     </View>
@@ -187,191 +141,54 @@ export function WaveFeedItem({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    backgroundColor: "#000",
-  },
-  tapArea: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 1,
-  },
-  // Gradient overlays
+  container: { backgroundColor: "#000" },
+  tapArea: { ...StyleSheet.absoluteFillObject, zIndex: 1 },
   gradientBottom: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 320,
-    backgroundColor: "transparent",
-    // Web-compatible gradient via layered shadows
-    zIndex: 2,
+    position: "absolute", bottom: 0, left: 0, right: 0, height: 320,
+    backgroundColor: "transparent", zIndex: 2,
     // @ts-ignore
-    backgroundImage: "linear-gradient(transparent, rgba(0,0,0,0.8))",
+    backgroundImage: "linear-gradient(transparent, rgba(0,0,0,0.85))",
   },
   gradientTop: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 120,
+    position: "absolute", top: 0, left: 0, right: 0, height: 100,
     zIndex: 2,
     // @ts-ignore
-    backgroundImage: "linear-gradient(rgba(0,0,0,0.4), transparent)",
+    backgroundImage: "linear-gradient(rgba(0,0,0,0.3), transparent)",
   },
   topBadge: {
-    position: "absolute",
-    top: 56,
-    left: 16,
-    backgroundColor: "rgba(255,255,255,0.18)",
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 20,
-    zIndex: 10,
-    // @ts-ignore
-    backdropFilter: "blur(8px)",
+    position: "absolute", top: 54, left: 16,
+    backgroundColor: "rgba(255,255,255,0.15)", paddingHorizontal: 10, paddingVertical: 4,
+    borderRadius: 4, zIndex: 10,
   },
-  topBadgeText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "600",
-    letterSpacing: 0.3,
-  },
-  // Right side actions
-  rightActions: {
-    position: "absolute",
-    right: 10,
-    bottom: 160,
-    alignItems: "center",
-    gap: 18,
-    zIndex: 10,
-  },
-  actionItem: {
-    alignItems: "center",
-    gap: 3,
-  },
-  orgAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "rgba(255,255,255,0.15)",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.5)",
-    marginBottom: 4,
-  },
-  orgAvatarText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "800",
-  },
+  topBadgeText: { color: "rgba(255,255,255,0.9)", fontSize: 11, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" },
+  rightActions: { position: "absolute", right: 10, bottom: 150, alignItems: "center", gap: 20, zIndex: 10 },
+  actionItem: { alignItems: "center", gap: 4 },
   actionCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "rgba(255,255,255,0.12)",
-    justifyContent: "center",
-    alignItems: "center",
+    width: 42, height: 42, borderRadius: 21,
+    backgroundColor: "rgba(255,255,255,0.1)", justifyContent: "center", alignItems: "center",
+    borderWidth: 1, borderColor: "rgba(255,255,255,0.15)",
   },
-  actionEmoji: {
-    fontSize: 20,
-  },
+  actionIcon: { color: "rgba(255,255,255,0.9)", fontSize: 16, fontWeight: "700" },
   actionLabel: {
-    color: "rgba(255,255,255,0.9)",
-    fontSize: 10,
-    fontWeight: "600",
-    textShadowColor: "rgba(0,0,0,0.6)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+    color: "rgba(255,255,255,0.7)", fontSize: 10, fontWeight: "600",
+    textShadowColor: "rgba(0,0,0,0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
   },
-  // Bottom overlay
-  bottomOverlay: {
-    position: "absolute",
-    bottom: 96,
-    left: 14,
-    right: 68,
-    gap: 6,
-    zIndex: 10,
-  },
+  bottomOverlay: { position: "absolute", bottom: 88, left: 16, right: 66, gap: 6, zIndex: 10 },
   clipCaption: {
-    color: "rgba(255,255,255,0.95)",
-    fontSize: 16,
-    fontWeight: "300",
-    fontStyle: "italic",
-    lineHeight: 22,
-    textShadowColor: "rgba(0,0,0,0.7)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
+    color: "rgba(255,255,255,0.85)", fontSize: 15, fontWeight: "300", fontStyle: "italic", lineHeight: 20,
+    textShadowColor: "rgba(0,0,0,0.6)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
   waveTitle: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "700",
-    lineHeight: 22,
-    textShadowColor: "rgba(0,0,0,0.7)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
+    color: "#fff", fontSize: 17, fontWeight: "700", lineHeight: 22, letterSpacing: -0.3,
+    textShadowColor: "rgba(0,0,0,0.6)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
-  metaRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 5,
-  },
-  metaChip: {
-    backgroundColor: "rgba(0,0,0,0.35)",
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-    // @ts-ignore
-    backdropFilter: "blur(4px)",
-  },
-  metaText: {
-    color: "rgba(255,255,255,0.92)",
-    fontSize: 11,
-    fontWeight: "500",
-  },
-  orgRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  orgName: {
-    color: "rgba(255,255,255,0.9)",
-    fontSize: 13,
-    fontWeight: "700",
-    textShadowColor: "rgba(0,0,0,0.6)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-  },
-  themeRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 5,
-  },
+  metaRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  metaText: { color: "rgba(255,255,255,0.7)", fontSize: 12, fontWeight: "500" },
+  metaDot: { color: "rgba(255,255,255,0.4)", fontSize: 12 },
+  themeRow: { flexDirection: "row", flexWrap: "wrap", gap: 4 },
   themeTag: {
-    backgroundColor: "rgba(255,255,255,0.13)",
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 12,
-    // @ts-ignore
-    backdropFilter: "blur(4px)",
+    backgroundColor: "rgba(255,255,255,0.1)", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4,
   },
-  themeText: {
-    color: "rgba(255,255,255,0.92)",
-    fontSize: 11,
-    fontWeight: "600",
-  },
-  // Marquee description
-  marquee: {
-    position: "absolute",
-    bottom: 72,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 14,
-    zIndex: 10,
-  },
-  marqueeText: {
-    color: "rgba(255,255,255,0.5)",
-    fontSize: 11,
-    fontWeight: "400",
-  },
+  themeText: { color: "rgba(255,255,255,0.8)", fontSize: 11, fontWeight: "600" },
+  description: { color: "rgba(255,255,255,0.45)", fontSize: 12, fontWeight: "400", marginTop: 2 },
 });

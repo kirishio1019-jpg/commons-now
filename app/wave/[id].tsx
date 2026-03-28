@@ -48,7 +48,7 @@ export default function WaveDetailScreen() {
         <Text style={styles.title}>{wave.title}</Text>
         {wave.is_personalized && (
           <View style={styles.personalizedBadge}>
-            <Text style={styles.personalizedText}>✨ あなた向けに選ばれました</Text>
+            <Text style={styles.personalizedText}>あなた向けに選ばれました</Text>
           </View>
         )}
       </View>
@@ -56,13 +56,13 @@ export default function WaveDetailScreen() {
       {/* Details */}
       <View style={styles.section}>
         <View style={styles.detailRow}>
-          <Text style={styles.detailIcon}>📅</Text>
+          <Text style={styles.detailLabel}>日時</Text>
           <Text style={styles.detailText}>
             {wave.date}　{wave.time_start}〜{wave.time_end}
           </Text>
         </View>
         <View style={styles.detailRow}>
-          <Text style={styles.detailIcon}>📍</Text>
+          <Text style={styles.detailLabel}>場所</Text>
           <View>
             <Text style={styles.detailText}>{wave.location.name}</Text>
             <Text style={styles.detailSubtext}>{wave.location.address}</Text>
@@ -72,7 +72,7 @@ export default function WaveDetailScreen() {
           </View>
         </View>
         <View style={styles.detailRow}>
-          <Text style={styles.detailIcon}>👥</Text>
+          <Text style={styles.detailLabel}>参加</Text>
           <Text style={styles.detailText}>
             {wave.current_participants}/{wave.capacity}人参加予定
           </Text>
@@ -160,7 +160,7 @@ export default function WaveDetailScreen() {
           style={styles.clipButton}
           onPress={() => router.push({ pathname: "/clip/post", params: { waveId: wave.id } })}
         >
-          <Text style={styles.clipButtonText}>📷 クリップを投稿する</Text>
+          <Text style={styles.clipButtonText}>クリップを投稿する</Text>
         </Pressable>
       </View>
 
@@ -237,9 +237,14 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 12,
   },
-  detailIcon: {
-    fontSize: 18,
-    marginTop: 1,
+  detailLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: Colors.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    width: 36,
+    marginTop: 2,
   },
   detailText: {
     fontSize: 15,
