@@ -20,6 +20,8 @@ import { useAuth } from "../../contexts/AuthContext";
 import { supabase } from "../../lib/supabase";
 import { Colors } from "../../lib/colors";
 import { Wave } from "../../types";
+import { generateInsights, loadPreferences, buildInitialPreferences } from "../../lib/ai";
+import type { UserPreferenceVector } from "../../lib/ai";
 
 const ALL_TAGS = [
   "植樹", "料理", "読書", "音楽", "焚き火", "農業", "ハイキング",
@@ -41,6 +43,18 @@ export default function MyPageScreen() {
   const [isPublic, setIsPublic] = useState(false);
   const [saving, setSaving] = useState(false);
   const [activeSection, setActiveSection] = useState<"waves" | "joined">("waves");
+  const [aiPrefs, setAiPrefs] = useState<UserPreferenceVector | null>(null);
+  const [insights, setInsights] = useState<string[]>([]);
+
+  // Load AI insights
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const p = await loadPreferences(user.id) ?? buildInitialPreferences(user);
+      setAiPrefs(p);
+      setInsights(generateInsights(p, commitments, waves));
+    })();
+  }, [user?.id, commitments.length, waves.length]);
 
   // Fetch my created waves
   const [myWaves, setMyWaves] = useState<Wave[]>([]);
@@ -257,6 +271,19 @@ export default function MyPageScreen() {
         </View>
       </View>
 
+      {/* AI Insights */}
+      {insights.length > 0 && (
+        <View style={styles.insightsCard}>
+          <Text style={styles.insightsTitle}>AI INSIGHTS</Text>
+          {insights.map((text, i) => (
+            <View key={i} style={styles.insightRow}>
+              <View style={styles.insightDot} />
+              <Text style={styles.insightText}>{text}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
       {/* Section tabs */}
       <View style={styles.sectionTabs}>
         <Pressable
@@ -407,6 +434,13 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 20, fontWeight: "800", color: Colors.text },
   statLabel: { fontSize: 11, color: Colors.textSecondary, fontWeight: "500" },
   statDivider: { width: 1, height: 28, backgroundColor: Colors.border },
+
+  // AI Insights
+  insightsCard: { marginHorizontal: 16, marginTop: 12, padding: 16, backgroundColor: Colors.primary + "08", borderRadius: 12, borderWidth: 1, borderColor: Colors.primary + "20" },
+  insightsTitle: { fontSize: 10, fontWeight: "800", color: Colors.primary, letterSpacing: 1.5, marginBottom: 10 },
+  insightRow: { flexDirection: "row", alignItems: "flex-start", gap: 8, marginBottom: 6 },
+  insightDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: Colors.primary, marginTop: 6 },
+  insightText: { fontSize: 13, color: Colors.text, lineHeight: 18, flex: 1 },
 
   // Section tabs
   sectionTabs: { flexDirection: "row", marginHorizontal: 16, marginTop: 16, borderBottomWidth: 1, borderBottomColor: Colors.border },

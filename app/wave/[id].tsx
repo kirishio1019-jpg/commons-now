@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
+import { eventTracker } from "../../lib/ai";
 import { useWave } from "../../hooks/useWave";
 import { Colors } from "../../lib/colors";
 import { CommitButton } from "../../components/CommitButton";
@@ -20,6 +21,11 @@ export default function WaveDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { getCommitLevel, updateCommitLevel } = useApp();
   const { wave, organization, clips, participants, loading } = useWave(id);
+
+  // Track detail view
+  useEffect(() => {
+    if (id) eventTracker.trackDetailView(id);
+  }, [id]);
 
   if (loading) {
     return (

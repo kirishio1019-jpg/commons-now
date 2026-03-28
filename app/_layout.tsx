@@ -5,6 +5,7 @@ import { useEffect } from "react";
 import { AuthProvider, useAuth } from "../contexts/AuthContext";
 import { AppProvider } from "../contexts/AppContext";
 import { Colors } from "../lib/colors";
+import { eventTracker } from "../lib/ai";
 
 function PhoneFrame({ children }: { children: React.ReactNode }) {
   if (Platform.OS !== "web") return <>{children}</>;
@@ -83,6 +84,13 @@ function AuthGate() {
       router.replace("/auth");
     } else if (session && inAuthScreen) {
       router.replace("/(tabs)");
+    }
+
+    // Initialize AI event tracker
+    if (session?.user?.id) {
+      eventTracker.init(session.user.id);
+      eventTracker.trackSessionStart();
+      return () => eventTracker.destroy();
     }
   }, [session, loading, segments]);
 

@@ -18,7 +18,8 @@ import { WaveFeedItem } from "../../components/WaveFeedItem";
 import { useApp } from "../../contexts/AppContext";
 import { CommitLevel } from "../../types";
 import { Colors } from "../../lib/colors";
-import { personalizeWaves } from "../../lib/personalize";
+import { useAIFeed } from "../../hooks/useAIFeed";
+import { eventTracker } from "../../lib/ai";
 
 export default function FeedScreen() {
   const { user, getCommitLevel, updateCommitLevel } = useApp();
@@ -33,18 +34,18 @@ export default function FeedScreen() {
   const itemHeight = layoutSize.height;
   const itemWidth = layoutSize.width;
 
-  // AI-powered personalized feed
-  const personalizedWaves = useMemo(
-    () => personalizeWaves({ waves, user, commitments }),
-    [waves, user, commitments]
-  );
+  // AI-powered personalized feed (8-signal scoring + collaborative + bandit)
+  const { rankedWaves } = useAIFeed(waves, commitments, user);
 
   const feedData = useMemo(() => {
-    return personalizedWaves.map((wave) => {
+    return rankedWaves.map((wave) => {
       const clip = clips.find((c) => c.wave_id === wave.id);
       return { wave, clipCaption: clip?.caption, key: wave.id };
     });
-  }, [personalizedWaves, clips]);
+  }, [rankedWaves, clips]);
+
+  // Track dwell time per wave
+  const dwellStartRef = useRef<Record<string, number>>({});
 
   const onLayout = useCallback((e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
@@ -54,10 +55,29 @@ export default function FeedScreen() {
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
       if (viewableItems.length > 0 && viewableItems[0].index != null) {
-        setActiveIndex(viewableItems[0].index);
+        const newIndex = viewableItems[0].index;
+        setActiveIndex(newIndex);
+
+        // Track impressions for newly visible waves
+        for (const item of viewableItems) {
+          const wave = feedData[item.index ?? 0]?.wave;
+          if (wave) {
+            eventTracker.trackImpression(wave.id, item.index ?? 0, activeTab);
+            dwellStartRef.current[wave.id] = Date.now();
+          }
+        }
+
+        // Track dwell for waves that left viewport
+        const visibleIds = new Set(viewableItems.map((v) => feedData[v.index ?? 0]?.wave?.id));
+        for (const [waveId, startTime] of Object.entries(dwellStartRef.current)) {
+          if (!visibleIds.has(waveId)) {
+            eventTracker.trackDwell(waveId, Date.now() - startTime);
+            delete dwellStartRef.current[waveId];
+          }
+        }
       }
     },
-    []
+    [feedData, activeTab]
   );
 
   const viewabilityConfig = useRef({
@@ -70,6 +90,7 @@ export default function FeedScreen() {
       const order: CommitLevel[] = ["none", "curious", "maybe", "going"];
       const idx = order.indexOf(current);
       const next = idx < order.length - 1 ? order[idx + 1] : order[0];
+      eventTracker.trackCommitChange(waveId, current, next);
       updateCommitLevel(waveId, next);
     },
     [getCommitLevel, updateCommitLevel]
