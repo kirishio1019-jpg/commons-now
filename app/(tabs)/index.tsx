@@ -13,15 +13,18 @@ import {
 import { router } from "expo-router";
 import { useWaves } from "../../hooks/useWaves";
 import { useClips } from "../../hooks/useClips";
+import { useCommitments } from "../../hooks/useCommitments";
 import { WaveFeedItem } from "../../components/WaveFeedItem";
 import { useApp } from "../../contexts/AppContext";
 import { CommitLevel } from "../../types";
 import { Colors } from "../../lib/colors";
+import { personalizeWaves } from "../../lib/personalize";
 
 export default function FeedScreen() {
-  const { getCommitLevel, updateCommitLevel } = useApp();
+  const { user, getCommitLevel, updateCommitLevel } = useApp();
   const { waves, loading: wavesLoading } = useWaves();
   const { clips } = useClips();
+  const { commitments } = useCommitments();
   const [activeIndex, setActiveIndex] = useState(0);
   const [activeTab, setActiveTab] = useState<"today" | "week">("today");
   const [layoutSize, setLayoutSize] = useState({ width: 390, height: 844 });
@@ -30,12 +33,18 @@ export default function FeedScreen() {
   const itemHeight = layoutSize.height;
   const itemWidth = layoutSize.width;
 
+  // AI-powered personalized feed
+  const personalizedWaves = useMemo(
+    () => personalizeWaves({ waves, user, commitments }),
+    [waves, user, commitments]
+  );
+
   const feedData = useMemo(() => {
-    return waves.map((wave) => {
+    return personalizedWaves.map((wave) => {
       const clip = clips.find((c) => c.wave_id === wave.id);
       return { wave, clipCaption: clip?.caption, key: wave.id };
     });
-  }, [waves, clips]);
+  }, [personalizedWaves, clips]);
 
   const onLayout = useCallback((e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
@@ -71,6 +80,34 @@ export default function FeedScreen() {
       <View style={[styles.container, styles.loadingContainer]}>
         <ActivityIndicator size="large" color="#fff" />
         <Text style={styles.loadingText}>波を読み込み中...</Text>
+      </View>
+    );
+  }
+
+  if (feedData.length === 0) {
+    return (
+      <View style={[styles.container, styles.loadingContainer]}>
+        <Text style={{ fontSize: 48 }}>🌊</Text>
+        <Text style={[styles.loadingText, { fontSize: 18, fontWeight: "700", marginTop: 16 }]}>
+          まだ波がありません
+        </Text>
+        <Text style={[styles.loadingText, { marginTop: 4 }]}>
+          最初の波を起こしてみよう
+        </Text>
+        <Pressable
+          style={{
+            marginTop: 20,
+            paddingHorizontal: 24,
+            paddingVertical: 12,
+            borderRadius: 24,
+            backgroundColor: Colors.primary,
+          }}
+          onPress={() => router.push("/wave/create")}
+        >
+          <Text style={{ color: "#fff", fontSize: 15, fontWeight: "700" }}>
+            ＋ 波を起こす
+          </Text>
+        </Pressable>
       </View>
     );
   }

@@ -46,8 +46,8 @@ export function WaveFeedItem({
 
   return (
     <View style={[styles.container, { width: itemWidth, height: itemHeight }]}>
-      {/* Animated background */}
-      <AnimatedBackground theme={wave.theme} isActive={isActive} />
+      {/* Animated background - auto-generated from content */}
+      <AnimatedBackground theme={wave.theme} isActive={isActive} description={wave.description} />
 
       {/* Bottom gradient overlay for readability */}
       <View style={styles.gradientBottom} />

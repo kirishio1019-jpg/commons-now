@@ -41,6 +41,21 @@ export function useCommitments() {
       const existing = commitments.find((cm) => cm.wave_id === waveId);
       const now = new Date().toISOString();
 
+      // If setting to "none", delete the commitment
+      if (level === "none") {
+        if (existing) {
+          // Optimistic: remove from local state
+          setCommitments((prev) => prev.filter((cm) => cm.wave_id !== waveId));
+
+          const { error: err } = await supabase
+            .from("commitments")
+            .delete()
+            .eq("id", existing.id);
+          if (err) fetch(); // revert on error
+        }
+        return;
+      }
+
       // Optimistic update
       setCommitments((prev) => {
         if (existing) {
@@ -66,7 +81,7 @@ export function useCommitments() {
           .from("commitments")
           .update({ level, updated_at: now })
           .eq("id", existing.id);
-        if (err) fetch(); // revert on error
+        if (err) fetch();
       } else {
         const { data, error: err } = await supabase
           .from("commitments")
@@ -79,9 +94,8 @@ export function useCommitments() {
           .single();
 
         if (err) {
-          fetch(); // revert
+          fetch();
         } else if (data) {
-          // Replace temp ID with real ID
           setCommitments((prev) =>
             prev.map((cm) =>
               cm.wave_id === waveId && cm.id.startsWith("temp-")
