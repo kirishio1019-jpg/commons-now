@@ -37,8 +37,9 @@ function fnv(s: string): number {
 
 export function VideoCompositor({ waveId, theme, title }: Props) {
   const cfg = THEMES[theme] ?? THEMES["植樹"];
-  const seed = `${cfg.keywords}-${fnv(waveId)}`;
-  const imgUrl = `https://picsum.photos/seed/${encodeURIComponent(seed)}/800/1400`;
+  // LoremFlickr: returns real Flickr CC photos matching keywords
+  const lock = fnv(waveId + title) % 99999;
+  const imgUrl = `https://loremflickr.com/800/1400/${cfg.keywords}?lock=${lock}`;
 
   return (
     <View style={StyleSheet.absoluteFill}>
