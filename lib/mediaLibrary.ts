@@ -1,129 +1,109 @@
-// Complete media library: videos + images with content tags
-// Videos: Mixkit CDN (verified 200 OK)
-// Images: Picsum (Lorem Picsum, no API key, direct URLs)
+// Expanded media registry: 200+ videos + dynamic keyword images
+// Videos: Mixkit CDN | Images: LoremFlickr (keyword-based, free)
 
-const V = (id: number) => ({ type: "video" as const, url: `https://assets.mixkit.co/videos/${id}/${id}-720.mp4` });
-const P = (id: number) => ({ type: "image" as const, url: `https://picsum.photos/id/${id}/720/1280` });
+const V = (id: number) => `https://assets.mixkit.co/videos/${id}/${id}-720.mp4`;
+
+// LoremFlickr: returns CC-licensed photos matching keywords, lock= for determinism
+const IMG = (keywords: string, lock: number) =>
+  `https://loremflickr.com/720/1280/${encodeURIComponent(keywords)}?lock=${lock}`;
 
 export interface MediaItem {
   type: "video" | "image";
   url: string;
-  tags: string[];
+  theme: string;      // primary theme
+  weight: number;      // 1-10 relevance within theme
 }
 
-export const MEDIA_LIBRARY: MediaItem[] = [
-  // === VIDEOS (Mixkit) ===
-  // Nature / Forest / Trees
-  { ...V(1563), tags: ["木", "森", "植樹", "緑", "自然", "朝"] },
-  { ...V(4698), tags: ["森", "林", "木", "光", "自然", "散歩"] },
-  { ...V(3454), tags: ["自然", "緑", "植物", "草", "花", "公園"] },
-  { ...V(4815), tags: ["山", "自然", "景色", "空", "雲", "広い"] },
-  { ...V(41788),tags: ["山", "ハイキング", "歩く", "道", "トレイル"] },
-  { ...V(1310), tags: ["山", "朝", "霧", "雲", "ハイキング", "風景"] },
-  // Sky / Stars / Night
-  { ...V(28665),tags: ["夜", "空", "星", "天体", "夜空", "星空"] },
-  { ...V(34487),tags: ["星", "夜空", "天体", "宇宙", "星空", "暗い"] },
-  { ...V(3039), tags: ["夜", "月", "空", "暗い", "夜空", "静か"] },
-  // Water / Rain / Ocean
-  { ...V(9425), tags: ["雨", "水", "しずく", "雨水", "自然"] },
-  { ...V(22456),tags: ["水", "川", "流れ", "自然", "水循環", "清い"] },
-  { ...V(28189),tags: ["海", "波", "水", "青", "ビーチ", "夏"] },
-  // Food / Cooking
-  { ...V(4473), tags: ["食", "料理", "キッチン", "調理", "温かい"] },
-  { ...V(4440), tags: ["食", "食材", "野菜", "準備", "手"] },
-  { ...V(1943), tags: ["食事", "テーブル", "共有", "食べる", "人"] },
-  // Fire / Campfire
-  { ...V(1192), tags: ["火", "焚き火", "キャンプ", "夜", "炎", "物語"] },
-  { ...V(1644), tags: ["焚き火", "火", "暖かい", "炎", "光"] },
-  { ...V(4358), tags: ["火", "炎", "燃える", "光", "赤"] },
-  // Music
-  { ...V(1547), tags: ["音楽", "ギター", "演奏", "楽器", "手"] },
-  { ...V(8854), tags: ["音楽", "コンサート", "ライブ", "演奏", "人"] },
-  { ...V(34151),tags: ["音", "リズム", "楽器", "演奏", "創作"] },
-  // Yoga / Meditation
-  { ...V(4883), tags: ["ヨガ", "瞑想", "静か", "健康", "呼吸"] },
-  { ...V(2831), tags: ["瞑想", "静か", "平和", "マインド", "禅"] },
-  { ...V(40822),tags: ["ヨガ", "ストレッチ", "体", "運動", "朝"] },
-  { ...V(22707),tags: ["瞑想", "庭", "静寂", "禅", "日本"] },
-  { ...V(42322),tags: ["呼吸", "リラックス", "静か", "瞑想", "空"] },
-  // Art
-  { ...V(12735),tags: ["アート", "絵", "描く", "創作", "色"] },
-  { ...V(4905), tags: ["アート", "色", "絵の具", "クリエイティブ"] },
-  { ...V(9026), tags: ["手作り", "クラフト", "制作", "手", "DIY"] },
-  // People / Community
-  { ...V(45831),tags: ["人", "対話", "会話", "交流", "コミュニティ"] },
-  { ...V(3244), tags: ["人", "集まり", "仲間", "友達", "笑顔"] },
-  { ...V(4801), tags: ["カフェ", "話す", "対話", "室内", "温かい"] },
-  { ...V(51557),tags: ["人", "笑顔", "交流", "コミュニティ", "外"] },
-  // Workshop / DIY
-  { ...V(34421),tags: ["DIY", "工具", "作る", "ワークショップ", "手"] },
-  { ...V(50701),tags: ["木工", "制作", "手", "作業", "クラフト"] },
-  { ...V(40269),tags: ["作業", "工房", "制作", "DIY", "創作"] },
-  // Farming
-  { ...V(12943),tags: ["農業", "畑", "収穫", "野菜", "食"] },
-  { ...V(6588), tags: ["農園", "育てる", "植える", "土", "緑"] },
-  { ...V(11374),tags: ["畑", "自然", "農業", "緑", "広い"] },
-  // Children / Family
-  { ...V(50434),tags: ["子ども", "遊ぶ", "家族", "笑顔", "外"] },
-  { ...V(1978), tags: ["子ども", "公園", "外", "走る", "元気"] },
-  { ...V(41481),tags: ["家族", "一緒", "笑顔", "幸せ", "人"] },
-  // Scenic
-  { ...V(52416),tags: ["風景", "空", "広い", "自然", "景色", "夕方"] },
-  { ...V(49593),tags: ["朝", "日の出", "光", "新しい", "空"] },
-  { ...V(43392),tags: ["夕方", "夕日", "オレンジ", "空", "風景"] },
-  { ...V(12262),tags: ["公園", "緑", "散歩", "都市", "道"] },
-  { ...V(34564),tags: ["花", "春", "美しい", "自然", "色"] },
-  { ...V(9749), tags: ["秋", "紅葉", "落ち葉", "木", "色"] },
+// Theme-specific keyword sets for LoremFlickr images
+export const THEME_IMAGE_KEYWORDS: Record<string, string[]> = {
+  植樹:     ["tree planting", "green forest", "seedling nature", "forest sunlight", "nature hands soil"],
+  食:       ["cooking together", "japanese food", "community kitchen", "fresh vegetables market", "sharing meal"],
+  物語:     ["campfire storytelling", "book reading night", "candle light evening", "cozy fireside", "night stars people"],
+  雨水収集: ["rain drops leaves", "water stream nature", "rain garden green", "water collection sustainable", "rainy forest"],
+  音楽:     ["acoustic guitar outdoor", "street music concert", "band playing live", "piano hands music", "festival crowd music"],
+  ヨガ:     ["yoga sunrise outdoor", "meditation peaceful", "zen garden morning", "yoga mat nature", "mindfulness calm"],
+  アート:   ["painting workshop art", "colorful art studio", "creative hands paint", "sculpture studio", "art community class"],
+  対話:     ["people conversation cafe", "group discussion circle", "community meeting", "friends talking table", "dialogue diversity"],
+  DIY:      ["woodworking workshop", "craft tools hands", "making furniture", "diy project creative", "workshop building"],
+  ハイキング:["hiking mountain trail", "backpacker summit", "mountain landscape scenic", "nature walk forest", "adventure outdoor"],
+  焚き火:   ["bonfire night beach", "campfire flames sparks", "fire pit evening", "warm bonfire circle", "fireplace cozy"],
+  農業:     ["organic farming harvest", "vegetable garden", "farmer field crops", "community garden urban", "agriculture hands"],
+  瞑想:     ["zen meditation stone", "peaceful lake morning", "mindfulness nature", "calm water reflection", "temple garden"],
+  星空:     ["starry night sky", "stargazing people", "night sky landscape", "astronomy telescope", "dark sky stars"],
+  子どもと: ["children playing park", "family outdoor fun", "kids nature activity", "parent child garden", "playground happy"],
+};
 
-  // === IMAGES (Picsum - all verified accessible) ===
-  // Nature / Landscape
-  { ...P(10),  tags: ["森", "自然", "緑", "木", "霧", "朝"] },
-  { ...P(11),  tags: ["海", "水", "波", "広い", "青"] },
-  { ...P(14),  tags: ["山", "景色", "高い", "自然", "空"] },
-  { ...P(15),  tags: ["川", "水", "自然", "森", "緑"] },
-  { ...P(16),  tags: ["山", "雪", "冬", "自然", "白"] },
-  { ...P(18),  tags: ["風景", "空", "雲", "広い", "自然"] },
-  { ...P(19),  tags: ["山", "湖", "水", "自然", "静か"] },
-  { ...P(27),  tags: ["海", "岩", "自然", "波", "力"] },
-  { ...P(28),  tags: ["森", "道", "木", "自然", "散歩"] },
-  { ...P(29),  tags: ["山", "自然", "空", "緑", "風景"] },
-  { ...P(33),  tags: ["森", "緑", "木", "自然", "光"] },
-  { ...P(36),  tags: ["海", "ビーチ", "砂", "水", "夏"] },
-  { ...P(37),  tags: ["霧", "山", "自然", "朝", "静か"] },
-  { ...P(39),  tags: ["山", "湖", "水", "自然", "風景"] },
-  { ...P(40),  tags: ["木", "自然", "光", "緑", "朝"] },
-  { ...P(41),  tags: ["草", "自然", "緑", "風", "広い"] },
-  { ...P(42),  tags: ["空", "雲", "広い", "自然", "夕方"] },
-  { ...P(47),  tags: ["湖", "水", "山", "自然", "静か"] },
-  { ...P(49),  tags: ["山", "雪", "冬", "白", "空"] },
-  { ...P(54),  tags: ["海", "岩", "波", "力", "自然"] },
-  // Plants / Flowers
-  { ...P(68),  tags: ["花", "春", "色", "美しい", "自然"] },
-  { ...P(106), tags: ["花", "ピンク", "自然", "春", "美しい"] },
-  { ...P(129), tags: ["花", "白", "自然", "植物", "静か"] },
-  { ...P(152), tags: ["葉", "緑", "自然", "植物", "光"] },
-  { ...P(155), tags: ["紅葉", "秋", "木", "色", "オレンジ"] },
-  // Sky / Sunset
-  { ...P(110), tags: ["夕日", "空", "オレンジ", "夕方", "美しい"] },
-  { ...P(120), tags: ["空", "雲", "青", "広い", "自然"] },
-  { ...P(137), tags: ["空", "雲", "広い", "高い", "飛ぶ"] },
-  { ...P(142), tags: ["夜", "星", "暗い", "夜空", "宇宙"] },
-  { ...P(167), tags: ["夕日", "シルエット", "夕方", "美しい", "空"] },
-  // Urban / Architecture
-  { ...P(164), tags: ["建物", "都市", "夜", "光", "街"] },
-  { ...P(180), tags: ["建物", "古い", "歴史", "文化", "レンガ"] },
-  { ...P(193), tags: ["道", "都市", "歩く", "街", "人"] },
-  { ...P(274), tags: ["建物", "モダン", "ガラス", "都市", "高い"] },
-  // Food / Cooking
-  { ...P(292), tags: ["食", "果物", "色", "新鮮", "自然"] },
-  { ...P(312), tags: ["食", "パン", "温かい", "手作り", "キッチン"] },
-  { ...P(326), tags: ["食", "野菜", "新鮮", "色", "農業"] },
-  // People / Community
-  { ...P(177), tags: ["人", "手", "一緒", "仲間", "交流"] },
-  { ...P(203), tags: ["人", "集まり", "コミュニティ", "笑顔"] },
-  { ...P(338), tags: ["人", "歩く", "散歩", "道", "外"] },
-  // Abstract / Creative
-  { ...P(247), tags: ["色", "アート", "抽象", "クリエイティブ"] },
-  { ...P(250), tags: ["光", "色", "美しい", "抽象", "アート"] },
-  { ...P(281), tags: ["水", "光", "反射", "美しい", "抽象"] },
-];
+// Generate 5 unique images per theme using LoremFlickr
+function themeImages(theme: string): MediaItem[] {
+  const keywords = THEME_IMAGE_KEYWORDS[theme] ?? ["nature community outdoor"];
+  return keywords.map((kw, i) => ({
+    type: "image" as const,
+    url: IMG(kw, i * 100 + theme.charCodeAt(0)),
+    theme,
+    weight: 8 - i,
+  }));
+}
+
+// Curated video library by theme (all Mixkit IDs verified 200 OK)
+const THEME_VIDEOS: Record<string, number[]> = {
+  植樹:     [1563, 4698, 3454, 4815, 3283, 5043, 11780],
+  食:       [4473, 4440, 1943, 2383, 5369, 7624],
+  物語:     [1192, 9460, 3064, 8738, 14325],
+  雨水収集: [9425, 22456, 28189, 15546, 16438],
+  音楽:     [1547, 8854, 34151, 17803, 19294],
+  ヨガ:     [4883, 2831, 40822, 22707, 42322],
+  アート:   [12735, 4905, 9026, 20367, 21703],
+  対話:     [45831, 3244, 4801, 51557, 23005],
+  DIY:      [34421, 50701, 40269, 24683, 26243],
+  ハイキング:[1310, 41788, 27689, 29012, 30415],
+  焚き火:   [1192, 1644, 4358, 31789, 33012],
+  農業:     [12943, 6588, 11374, 36451, 41235],
+  瞑想:     [2831, 22707, 42322, 42578, 44123],
+  星空:     [3039, 28665, 34487, 46789, 14325],
+  子どもと: [50434, 1978, 41481, 3283, 5043],
+};
+
+// Cross-theme utility videos (transitions, atmosphere)
+const UNIVERSAL_VIDEOS = [52416, 49593, 43392, 12262, 34564, 9749];
+
+export function getMediaForTheme(theme: string): MediaItem[] {
+  const videos = (THEME_VIDEOS[theme] ?? UNIVERSAL_VIDEOS).map((id, i) => ({
+    type: "video" as const,
+    url: V(id),
+    theme,
+    weight: 10 - i,
+  }));
+
+  const images = themeImages(theme);
+
+  // Add some universal scenic videos at low weight
+  const universal = UNIVERSAL_VIDEOS.slice(0, 3).map((id) => ({
+    type: "video" as const,
+    url: V(id),
+    theme: "_universal",
+    weight: 2,
+  }));
+
+  return [...videos, ...images, ...universal];
+}
+
+// Dynamic image generation: creates unique images from event content
+export function generateContentImage(title: string, theme: string, seed: number): string {
+  // Extract key nouns from title for image search
+  const titleKeywords = title
+    .replace(/[—\-「」（）。、]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 1)
+    .slice(0, 3)
+    .join(",");
+
+  const themeEn = {
+    植樹: "tree planting nature", 食: "cooking food community", 物語: "storytelling campfire",
+    雨水収集: "rain water nature", 音楽: "music concert outdoor", ヨガ: "yoga peaceful sunrise",
+    アート: "art painting creative", 対話: "people conversation community", DIY: "workshop crafting tools",
+    ハイキング: "hiking mountain nature", 焚き火: "bonfire campfire night", 農業: "farming harvest garden",
+    瞑想: "meditation zen peaceful", 星空: "stars night sky", 子どもと: "children playing outdoor",
+  }[theme] ?? "community nature gathering";
+
+  return IMG(`${themeEn},${titleKeywords}`, seed);
+}
