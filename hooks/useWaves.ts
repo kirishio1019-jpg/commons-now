@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../lib/supabase";
 import { Wave } from "../types";
 import { AppState } from "react-native";
+import { generateAIVideo } from "../lib/aiVideo";
 
 export function useWaves() {
   const [waves, setWaves] = useState<Wave[]>([]);
@@ -21,7 +22,19 @@ export function useWaves() {
     if (err) {
       setError(err.message);
     } else {
-      setWaves((data ?? []) as Wave[]);
+      const waves = (data ?? []) as Wave[];
+      // Auto-assign videos to waves that don't have one
+      for (const w of waves) {
+        if (!w.image_url) {
+          try {
+            const url = await generateAIVideo(w.theme, w.title, w.description);
+            w.image_url = url;
+            // Save to DB in background
+            supabase.from("waves").update({ image_url: url }).eq("id", w.id).then(() => {});
+          } catch {}
+        }
+      }
+      setWaves(waves);
     }
     setLoading(false);
   }, []);
