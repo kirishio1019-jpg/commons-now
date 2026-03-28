@@ -18,7 +18,7 @@ import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
 import { Colors } from "../../lib/colors";
 import { AnimatedBackground } from "../../components/AnimatedBackground";
-import { generateAIVideo } from "../../lib/aiVideo";
+// Video is now generated in real-time by VideoCompositor — no pre-generation needed
 
 const THEMES = [
   "植樹", "食", "物語", "雨水収集", "音楽", "ヨガ", "アート",
@@ -151,16 +151,6 @@ export default function CreateWaveScreen() {
         image_url: "", is_personalized: false, is_auto_generated: false, status: "upcoming",
       }).select("id").single();
       if (waveErr) throw waveErr;
-
-      // Auto-fetch video for this event
-      if (wave) {
-        try {
-          const videoUrl = await generateAIVideo(theme, title, description);
-          if (videoUrl) {
-            await supabase.from("waves").update({ image_url: videoUrl }).eq("id", wave.id);
-          }
-        } catch {}
-      }
 
       // Upload user clip if attached
       if (media && wave) {
