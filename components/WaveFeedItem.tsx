@@ -1,11 +1,10 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, Pressable, Platform } from "react-native";
 import { router } from "expo-router";
 import { Wave, CommitLevel } from "../types";
 import { Colors } from "../lib/colors";
 import { VideoCompositor } from "./VideoCompositor";
 import { AnimatedBackground } from "./AnimatedBackground";
-import { selectClips } from "../lib/aiVideo";
 import { supabase } from "../lib/supabase";
 
 interface WaveFeedItemProps {
@@ -37,23 +36,17 @@ export function WaveFeedItem({
       .then(({ data }) => { if (data) setOrgName(data.name); });
   }, [wave.organizer_id]);
 
-  // Select 3 content-matched clips for the compositor
-  const videoClips = useMemo(
-    () => Platform.OS === "web" ? selectClips(wave.theme, wave.title, wave.description) : [],
-    [wave.theme, wave.title, wave.description]
-  );
-
   const isOnline = wave.location?.is_online === true;
 
   return (
     <View style={[styles.container, { width: itemWidth, height: itemHeight }]}>
-      {/* Background: Video compositor on web, animated bg on native */}
-      {Platform.OS === "web" && videoClips.length > 0 ? (
+      {/* Background: AI Video Compositor (6-segment storyboard) */}
+      {Platform.OS === "web" ? (
         <VideoCompositor
-          clips={videoClips}
+          waveId={wave.id}
           theme={wave.theme}
           title={wave.title}
-          orgName={orgName}
+          description={wave.description}
           isActive={isActive}
           width={itemWidth}
           height={itemHeight}
