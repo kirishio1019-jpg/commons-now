@@ -111,6 +111,10 @@ function AuthGate() {
         options={{ title: "波の詳細", presentation: "card" }}
       />
       <Stack.Screen
+        name="wave/create"
+        options={{ title: "波を起こす", presentation: "modal" }}
+      />
+      <Stack.Screen
         name="clip/post"
         options={{ title: "クリップ投稿", presentation: "modal" }}
       />
