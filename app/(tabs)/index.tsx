@@ -10,11 +10,13 @@ import {
   LayoutChangeEvent,
   ActivityIndicator,
 } from "react-native";
+import { router } from "expo-router";
 import { useWaves } from "../../hooks/useWaves";
 import { useClips } from "../../hooks/useClips";
 import { WaveFeedItem } from "../../components/WaveFeedItem";
 import { useApp } from "../../contexts/AppContext";
 import { CommitLevel } from "../../types";
+import { Colors } from "../../lib/colors";
 
 export default function FeedScreen() {
   const { getCommitLevel, updateCommitLevel } = useApp();
@@ -110,6 +112,14 @@ export default function FeedScreen() {
         </Pressable>
       </View>
 
+      {/* FAB - 投稿ボタン */}
+      <Pressable
+        style={styles.fab}
+        onPress={() => router.push("/wave/create")}
+      >
+        <Text style={styles.fabText}>＋</Text>
+      </Pressable>
+
       <FlatList
         ref={flatListRef}
         data={feedData}
@@ -185,5 +195,28 @@ const styles = StyleSheet.create({
   },
   tabTextActive: {
     color: "#fff",
+  },
+  fab: {
+    position: "absolute",
+    bottom: 80,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: Colors.primary,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 200,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  fabText: {
+    color: "#fff",
+    fontSize: 28,
+    fontWeight: "600",
+    lineHeight: 30,
   },
 });

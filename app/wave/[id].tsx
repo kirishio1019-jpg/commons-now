@@ -154,6 +154,16 @@ export default function WaveDetailScreen() {
         </View>
       )}
 
+      {/* Clip post button */}
+      <View style={styles.clipSection}>
+        <Pressable
+          style={styles.clipButton}
+          onPress={() => router.push({ pathname: "/clip/post", params: { waveId: wave.id } })}
+        >
+          <Text style={styles.clipButtonText}>📷 クリップを投稿する</Text>
+        </Pressable>
+      </View>
+
       {/* Commit button */}
       <View style={styles.commitSection}>
         <CommitButton
@@ -319,6 +329,23 @@ const styles = StyleSheet.create({
   impactLabel: {
     fontSize: 13,
     color: Colors.textSecondary,
+  },
+  clipSection: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+  },
+  clipButton: {
+    backgroundColor: Colors.bgCard,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  clipButtonText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: Colors.text,
   },
   commitSection: {
     padding: 24,
