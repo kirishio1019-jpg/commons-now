@@ -19,6 +19,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { Colors } from "../../lib/colors";
 import { AnimatedBackground } from "../../components/AnimatedBackground";
 import { generateVideo } from "../../lib/videoGenerator";
+import { generateAIVideo } from "../../lib/aiVideo";
 
 const THEMES = [
   "植樹", "食", "物語", "雨水収集", "音楽", "ヨガ", "アート",
@@ -152,8 +153,16 @@ export default function CreateWaveScreen() {
       }).select("id").single();
       if (waveErr) throw waveErr;
 
-      // Auto-generate video from content
+      // Auto-generate video: try AI first, fallback to Canvas
       if (wave) {
+        // Start AI video generation in background (don't block)
+        generateAIVideo(theme, title, description).then(async (aiUrl) => {
+          if (aiUrl) {
+            await supabase.from("waves").update({ image_url: aiUrl }).eq("id", wave.id);
+          }
+        }).catch(() => {});
+
+        // Also generate Canvas video as immediate fallback
         try {
           const videoBlob = await generateVideo(
             theme, title, description, date,
@@ -165,7 +174,11 @@ export default function CreateWaveScreen() {
               .from("clips").upload(videoName, videoBlob, { contentType: "video/webm" });
             if (!vErr) {
               const { data: { publicUrl } } = supabase.storage.from("clips").getPublicUrl(videoName);
-              await supabase.from("waves").update({ image_url: publicUrl }).eq("id", wave.id);
+              // Only set if AI hasn't already set it
+              const { data: current } = await supabase.from("waves").select("image_url").eq("id", wave.id).single();
+              if (!current?.image_url) {
+                await supabase.from("waves").update({ image_url: publicUrl }).eq("id", wave.id);
+              }
             }
           }
         } catch {}
