@@ -195,7 +195,7 @@ export default function CreateWaveScreen() {
             {!isOnline && <Text style={s.previewMetaText}>{locationQuery || locationName.split(",")[0]}</Text>}
             {isOnline && <Text style={s.previewMetaText}>オンライン</Text>}
           </View>
-          <Pressable style={s.previewButton} onPress={() => router.back()}>
+          <Pressable style={s.previewButton} onPress={() => router.replace("/(tabs)")}>
             <Text style={s.previewButtonText}>フィードに戻る</Text>
           </Pressable>
         </View>

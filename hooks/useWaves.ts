@@ -1,17 +1,17 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../lib/supabase";
 import { Wave } from "../types";
+import { AppState } from "react-native";
 
 export function useWaves() {
   const [waves, setWaves] = useState<Wave[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetch = useCallback(async () => {
+  const fetchWaves = useCallback(async () => {
     setLoading(true);
     setError(null);
 
-    // Fetch all upcoming waves (no hard date filter — AI handles ranking)
     const { data, error: err } = await supabase
       .from("waves")
       .select("*")
@@ -26,9 +26,24 @@ export function useWaves() {
     setLoading(false);
   }, []);
 
+  // Initial fetch
   useEffect(() => {
-    fetch();
-  }, [fetch]);
+    fetchWaves();
+  }, [fetchWaves]);
 
-  return { waves, loading, error, refetch: fetch };
+  // Refetch when app comes to foreground (covers back-navigation from create screen)
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") fetchWaves();
+    });
+    return () => sub.remove();
+  }, [fetchWaves]);
+
+  // Also poll every 30s to keep feed fresh
+  useEffect(() => {
+    const interval = setInterval(fetchWaves, 30000);
+    return () => clearInterval(interval);
+  }, [fetchWaves]);
+
+  return { waves, loading, error, refetch: fetchWaves };
 }
