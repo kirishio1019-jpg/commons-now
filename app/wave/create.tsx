@@ -18,7 +18,6 @@ import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
 import { Colors } from "../../lib/colors";
 import { AnimatedBackground } from "../../components/AnimatedBackground";
-import { generateVideo } from "../../lib/videoGenerator";
 import { generateAIVideo } from "../../lib/aiVideo";
 
 const THEMES = [
@@ -153,33 +152,12 @@ export default function CreateWaveScreen() {
       }).select("id").single();
       if (waveErr) throw waveErr;
 
-      // Auto-generate video: try AI first, fallback to Canvas
+      // Auto-fetch video for this event
       if (wave) {
-        // Start AI video generation in background (don't block)
-        generateAIVideo(theme, title, description).then(async (aiUrl) => {
-          if (aiUrl) {
-            await supabase.from("waves").update({ image_url: aiUrl }).eq("id", wave.id);
-          }
-        }).catch(() => {});
-
-        // Also generate Canvas video as immediate fallback
         try {
-          const videoBlob = await generateVideo(
-            theme, title, description, date,
-            isOnline ? "オンライン" : (locationQuery || locationName.split(",")[0])
-          );
-          if (videoBlob) {
-            const videoName = `generated/${wave.id}.webm`;
-            const { error: vErr } = await supabase.storage
-              .from("clips").upload(videoName, videoBlob, { contentType: "video/webm" });
-            if (!vErr) {
-              const { data: { publicUrl } } = supabase.storage.from("clips").getPublicUrl(videoName);
-              // Only set if AI hasn't already set it
-              const { data: current } = await supabase.from("waves").select("image_url").eq("id", wave.id).single();
-              if (!current?.image_url) {
-                await supabase.from("waves").update({ image_url: publicUrl }).eq("id", wave.id);
-              }
-            }
+          const videoUrl = await generateAIVideo(theme, title, description);
+          if (videoUrl) {
+            await supabase.from("waves").update({ image_url: videoUrl }).eq("id", wave.id);
           }
         } catch {}
       }

@@ -1,88 +1,74 @@
-// AI Video Generation via Replicate API
+// Auto video sourcing via Pexels API (free, real footage)
+// Falls back to curated free video URLs if API unavailable
 
-const API = "https://api.replicate.com/v1/predictions";
+const PEXELS_API = "https://api.pexels.com/videos/search";
+const PEXELS_KEY = "3yrLFmRNfRWGKAsLxMgfWRVGWI17fRiAnIGcKgCXvHJiV7W3HY2kVhfH";
 
-const THEME_PROMPTS: Record<string, string> = {
-  植樹: "Cinematic shot of people planting young trees in a beautiful green forest clearing, morning golden sunlight filtering through leaves, warm natural lighting, community gathering outdoors, 4K cinematic quality, shallow depth of field",
-  食: "Warm cinematic close-up of hands preparing fresh food in a community kitchen, steam rising from cooking pots, people gathering around a wooden table, golden hour indoor lighting, Japanese home cooking atmosphere, 4K quality",
-  物語: "Atmospheric cinematic shot of people sitting around a campfire at dusk by a river, warm firelight illuminating faces, storytelling circle, starry sky above, peaceful evening atmosphere, 4K cinematic",
-  雨水収集: "Beautiful cinematic shot of rain falling on green leaves and flowing into collection barrels, crystal clear water droplets in slow motion, lush garden setting, fresh atmosphere after rain, 4K nature documentary style",
-  音楽: "Cinematic wide shot of a small outdoor acoustic concert in a park, musicians playing guitar under string lights at golden hour, audience sitting on grass, warm evening atmosphere, 4K quality",
-  ヨガ: "Serene cinematic shot of people doing yoga in a peaceful outdoor setting at sunrise, misty mountains in background, soft golden morning light, calm and meditative atmosphere, 4K quality",
-  アート: "Cinematic close-up of artists painting together in an open-air workshop, vibrant colors on canvases, creative community gathering, natural daylight, paint-splattered hands, 4K art documentary style",
-  対話: "Warm cinematic shot of a diverse group of people in deep conversation at a cozy community space, soft indoor lighting, books and plants in background, intimate dialogue circle, 4K quality",
-  DIY: "Cinematic shot of people building wooden furniture together in a workshop, sawdust in sunbeams, hands using tools, collaborative crafting, warm industrial lighting, 4K maker documentary style",
-  ハイキング: "Breathtaking cinematic aerial shot of hikers on a mountain trail surrounded by vast green forest, panoramic vista, morning mist in valleys, adventure atmosphere, 4K nature cinematography",
-  焚き火: "Intimate cinematic shot of a bonfire at twilight on a riverbank, warm flickering firelight on faces, sparks rising into purple sky, peaceful community gathering, 4K atmospheric quality",
-  農業: "Beautiful cinematic shot of people harvesting vegetables in a sunlit organic farm, golden hour lighting, green fields stretching to horizon, community farming, 4K agricultural documentary style",
-  瞑想: "Serene cinematic shot of people meditating in a minimalist zen garden at dawn, soft fog, morning light through bamboo, absolute tranquility, 4K contemplative quality",
-  星空: "Stunning cinematic wide shot of people stargazing lying on a hilltop, Milky Way stretching across dark sky, telescope silhouette, peaceful night atmosphere, 4K astrophotography quality",
-  子どもと: "Joyful cinematic shot of children and parents playing together in a sunny park, colorful activities, genuine laughter, warm family atmosphere, natural lighting, 4K family documentary style",
+// Theme → search keywords for cinematic stock footage
+const THEME_SEARCHES: Record<string, string> = {
+  植樹: "planting trees nature forest",
+  食: "cooking community food preparation",
+  物語: "campfire night storytelling",
+  雨水収集: "rain nature water drops",
+  音楽: "outdoor concert acoustic music",
+  ヨガ: "yoga sunrise outdoor meditation",
+  アート: "painting art creative workshop",
+  対話: "people talking conversation cafe",
+  DIY: "woodworking crafting workshop hands",
+  ハイキング: "hiking mountain trail nature",
+  焚き火: "bonfire campfire night flames",
+  農業: "farming harvest organic vegetables",
+  瞑想: "meditation zen peaceful garden",
+  星空: "stars night sky milky way",
+  子どもと: "children playing park family",
 };
 
-function buildPrompt(theme: string, title: string, description: string): string {
-  const base = THEME_PROMPTS[theme] ?? "Cinematic shot of a diverse community gathering outdoors in beautiful natural setting, warm golden hour lighting, people connecting and sharing, 4K quality";
-  const kw: string[] = [];
-  if (description.includes("朝") || title.includes("朝")) kw.push("morning sunrise");
-  if (description.includes("夜") || title.includes("夜")) kw.push("evening twilight");
-  if (description.includes("海")) kw.push("ocean coastline");
-  if (description.includes("山")) kw.push("mountain landscape");
-  if (description.includes("川")) kw.push("riverside");
-  if (description.includes("公園")) kw.push("park setting");
-  if (description.includes("春")) kw.push("cherry blossoms spring");
-  if (description.includes("冬")) kw.push("winter atmosphere");
-  return base + (kw.length ? `, ${kw.join(", ")}` : "") + ", smooth camera movement";
-}
+// Curated fallback videos (free Pexels videos, direct file URLs)
+const FALLBACK_VIDEOS: Record<string, string> = {
+  植樹: "https://videos.pexels.com/video-files/3571264/3571264-uhd_2560_1440_30fps.mp4",
+  食: "https://videos.pexels.com/video-files/3195394/3195394-uhd_2560_1440_25fps.mp4",
+  物語: "https://videos.pexels.com/video-files/857251/857251-hd_1920_1080_25fps.mp4",
+  雨水収集: "https://videos.pexels.com/video-files/2491284/2491284-uhd_2560_1440_24fps.mp4",
+  音楽: "https://videos.pexels.com/video-files/3015510/3015510-hd_1920_1080_24fps.mp4",
+  ヨガ: "https://videos.pexels.com/video-files/4056990/4056990-uhd_2560_1440_25fps.mp4",
+  アート: "https://videos.pexels.com/video-files/3209211/3209211-uhd_2560_1440_25fps.mp4",
+  対話: "https://videos.pexels.com/video-files/6003988/6003988-uhd_2560_1440_30fps.mp4",
+  DIY: "https://videos.pexels.com/video-files/5710614/5710614-uhd_2560_1440_30fps.mp4",
+  ハイキング: "https://videos.pexels.com/video-files/4763824/4763824-uhd_2560_1440_24fps.mp4",
+  焚き火: "https://videos.pexels.com/video-files/852395/852395-hd_1920_1080_30fps.mp4",
+  農業: "https://videos.pexels.com/video-files/2889786/2889786-hd_1920_1080_30fps.mp4",
+  瞑想: "https://videos.pexels.com/video-files/5200540/5200540-uhd_2560_1440_30fps.mp4",
+  星空: "https://videos.pexels.com/video-files/1721294/1721294-uhd_4096_2160_25fps.mp4",
+  子どもと: "https://videos.pexels.com/video-files/5622490/5622490-uhd_2560_1440_25fps.mp4",
+};
+
+const DEFAULT_FALLBACK = "https://videos.pexels.com/video-files/3571264/3571264-uhd_2560_1440_30fps.mp4";
 
 export async function generateAIVideo(
   theme: string, title: string, description: string,
 ): Promise<string | null> {
-  const token = process.env.EXPO_PUBLIC_REPLICATE_TOKEN;
-  if (!token) return null;
+  // Try Pexels API search first for variety
+  try {
+    const query = THEME_SEARCHES[theme] ?? "community nature gathering";
+    const res = await fetch(`${PEXELS_API}?query=${encodeURIComponent(query)}&per_page=5&orientation=portrait`, {
+      headers: { "Authorization": PEXELS_KEY },
+    });
 
-  const prompt = buildPrompt(theme, title, description);
-
-  // Try multiple models in order of preference
-  const models = [
-    { version: "b01a98e1fdab1a82dd4d1de8dba5a2ef397ac9ef67c26e376b9b79b0a1fa090d", input: { prompt, prompt_optimizer: true } },
-    { version: "1e9e4e9bb1300f6aa7552e1ea7a0bfaa52cf8d36e5eb2aab2c6cfb5344e68b53", input: { prompt } },
-  ];
-
-  for (const model of models) {
-    try {
-      const res = await fetch(API, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ version: model.version, input: model.input }),
-      });
-
-      if (!res.ok) continue;
+    if (res.ok) {
       const data = await res.json();
-      const result = await poll(data.urls?.get || `${API}/${data.id}`, token);
-      if (result) return result;
-    } catch {
-      continue;
-    }
-  }
-
-  return null;
-}
-
-async function poll(url: string, token: string): Promise<string | null> {
-  for (let i = 0; i < 90; i++) {
-    await new Promise((r) => setTimeout(r, 4000));
-    try {
-      const res = await fetch(url, { headers: { "Authorization": `Bearer ${token}` } });
-      const d = await res.json();
-      if (d.status === "succeeded") {
-        const out = Array.isArray(d.output) ? d.output[0] : d.output;
-        return typeof out === "string" ? out : null;
+      if (data.videos && data.videos.length > 0) {
+        // Pick a random video for variety
+        const video = data.videos[Math.floor(Math.random() * data.videos.length)];
+        // Get the best quality file (prefer HD)
+        const files = video.video_files || [];
+        const best = files
+          .filter((f: any) => f.width >= 720)
+          .sort((a: any, b: any) => (b.width || 0) - (a.width || 0))[0];
+        if (best?.link) return best.link;
       }
-      if (d.status === "failed" || d.status === "canceled") return null;
-    } catch { continue; }
-  }
-  return null;
+    }
+  } catch {}
+
+  // Fallback to curated videos
+  return FALLBACK_VIDEOS[theme] ?? DEFAULT_FALLBACK;
 }
