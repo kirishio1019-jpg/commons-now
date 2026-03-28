@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, Pressable } from "react-native";
+import { View, Text, StyleSheet, Pressable, Platform } from "react-native";
 import { router } from "expo-router";
+import { Video, ResizeMode } from "expo-av";
 import { Wave, CommitLevel } from "../types";
 import { Colors } from "../lib/colors";
 import { AnimatedBackground } from "./AnimatedBackground";
@@ -29,7 +30,6 @@ export function WaveFeedItem({
   const commit = COMMIT_LABELS[commitLevel];
   const [orgName, setOrgName] = useState<string>("");
 
-  // Fetch organizer name
   useEffect(() => {
     if (!wave.organizer_id) return;
     supabase.from("organizations").select("name").eq("id", wave.organizer_id).single()
@@ -37,32 +37,62 @@ export function WaveFeedItem({
   }, [wave.organizer_id]);
 
   const isOnline = wave.location?.is_online === true;
-  const dateStr = wave.date;
-  const timeStr = wave.time_start;
+  const hasVideo = wave.image_url && wave.image_url.length > 5;
 
   return (
     <View style={[styles.container, { width: itemWidth, height: itemHeight }]}>
-      <AnimatedBackground theme={wave.theme} isActive={isActive} description={wave.description} title={wave.title} />
+      {/* Background: real video if available, otherwise animated */}
+      {hasVideo ? (
+        Platform.OS === "web" ? (
+          <video
+            src={wave.image_url}
+            autoPlay={isActive}
+            loop
+            muted
+            playsInline
+            style={{
+              position: "absolute", top: 0, left: 0, width: "100%", height: "100%",
+              objectFit: "cover", zIndex: 0,
+            } as any}
+          />
+        ) : (
+          <Video
+            source={{ uri: wave.image_url }}
+            style={StyleSheet.absoluteFill}
+            resizeMode={ResizeMode.COVER}
+            shouldPlay={isActive}
+            isLooping
+            isMuted
+          />
+        )
+      ) : (
+        <AnimatedBackground theme={wave.theme} isActive={isActive} description={wave.description} title={wave.title} />
+      )}
+
       <View style={styles.gradientBottom} />
       <View style={styles.gradientTop} />
 
       <Pressable style={styles.tapArea} onPress={() => router.push(`/wave/${wave.id}`)} />
 
-      {/* For You badge */}
       {wave.is_personalized && (
         <View style={styles.topBadge}>
           <Text style={styles.topBadgeText}>FOR YOU</Text>
         </View>
       )}
 
-      {/* Online badge */}
       {isOnline && (
         <View style={[styles.topBadge, { left: undefined, right: 16 }]}>
           <Text style={styles.topBadgeText}>ONLINE</Text>
         </View>
       )}
 
-      {/* Right side actions */}
+      {/* Generating indicator */}
+      {!hasVideo && (
+        <View style={styles.generatingBadge}>
+          <Text style={styles.generatingText}>動画を生成中...</Text>
+        </View>
+      )}
+
       <View style={styles.rightActions}>
         <Pressable style={styles.actionItem} onPress={onCommit}>
           <View style={[styles.actionCircle, commitLevel !== "none" && { borderColor: commit.color + "60", backgroundColor: commit.color + "15" }]}>
@@ -86,25 +116,21 @@ export function WaveFeedItem({
         </Pressable>
       </View>
 
-      {/* Bottom content — organizer first, then title */}
       <View style={styles.bottomOverlay}>
         {clipCaption && <Text style={styles.clipCaption}>"{clipCaption}"</Text>}
 
-        {/* Organizer name — prominent */}
         {orgName ? (
           <Pressable onPress={() => router.push(`/org/${wave.organizer_id}`)}>
             <Text style={styles.orgName}>@{orgName}</Text>
           </Pressable>
         ) : null}
 
-        {/* Title — below organizer */}
         <Text style={styles.waveTitle} numberOfLines={2}>{wave.title}</Text>
 
-        {/* Meta line */}
         <View style={styles.metaRow}>
-          <Text style={styles.metaText}>{dateStr}</Text>
+          <Text style={styles.metaText}>{wave.date}</Text>
           <Text style={styles.metaDot}>·</Text>
-          <Text style={styles.metaText}>{timeStr}</Text>
+          <Text style={styles.metaText}>{wave.time_start}</Text>
           {!isOnline && wave.distance_km != null && (
             <>
               <Text style={styles.metaDot}>·</Text>
@@ -119,15 +145,8 @@ export function WaveFeedItem({
           )}
         </View>
 
-        {/* Tags */}
         <View style={styles.tagRow}>
           <View style={styles.tag}><Text style={styles.tagText}>#{wave.theme}</Text></View>
-          {wave.eco_impact_target.trees_planted > 0 && (
-            <View style={styles.tag}><Text style={styles.tagText}>{wave.eco_impact_target.trees_planted}本植樹</Text></View>
-          )}
-          {wave.eco_impact_target.meals_shared > 0 && (
-            <View style={styles.tag}><Text style={styles.tagText}>{wave.eco_impact_target.meals_shared}食共有</Text></View>
-          )}
         </View>
 
         <Text style={styles.desc} numberOfLines={1}>{wave.description}</Text>
@@ -152,6 +171,8 @@ const styles = StyleSheet.create({
   },
   topBadge: { position: "absolute", top: 52, left: 16, backgroundColor: "rgba(255,255,255,0.12)", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 3, zIndex: 10 },
   topBadgeText: { color: "rgba(255,255,255,0.8)", fontSize: 9, fontWeight: "800", letterSpacing: 1 },
+  generatingBadge: { position: "absolute", top: 52, right: 16, backgroundColor: "rgba(255,255,255,0.08)", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 3, zIndex: 10 },
+  generatingText: { color: "rgba(255,255,255,0.4)", fontSize: 9, fontWeight: "600" },
 
   rightActions: { position: "absolute", right: 10, bottom: 150, alignItems: "center", gap: 18, zIndex: 10 },
   actionItem: { alignItems: "center", gap: 3 },
@@ -161,26 +182,13 @@ const styles = StyleSheet.create({
 
   bottomOverlay: { position: "absolute", bottom: 82, left: 16, right: 64, gap: 5, zIndex: 10 },
   clipCaption: { color: "rgba(255,255,255,0.8)", fontSize: 14, fontWeight: "300", fontStyle: "italic", lineHeight: 19 },
-
-  // Organizer — large and prominent
-  orgName: {
-    color: "#fff", fontSize: 20, fontWeight: "800", letterSpacing: -0.5,
-    textShadowColor: "rgba(0,0,0,0.7)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
-  },
-
-  // Title — smaller, below org
-  waveTitle: {
-    color: "rgba(255,255,255,0.9)", fontSize: 14, fontWeight: "600", lineHeight: 19,
-    textShadowColor: "rgba(0,0,0,0.6)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
-  },
-
+  orgName: { color: "#fff", fontSize: 20, fontWeight: "800", letterSpacing: -0.5, textShadowColor: "rgba(0,0,0,0.7)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+  waveTitle: { color: "rgba(255,255,255,0.9)", fontSize: 14, fontWeight: "600", lineHeight: 19, textShadowColor: "rgba(0,0,0,0.6)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   metaRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   metaText: { color: "rgba(255,255,255,0.6)", fontSize: 11, fontWeight: "500" },
   metaDot: { color: "rgba(255,255,255,0.3)" },
-
   tagRow: { flexDirection: "row", flexWrap: "wrap", gap: 4 },
   tag: { backgroundColor: "rgba(255,255,255,0.08)", paddingHorizontal: 7, paddingVertical: 2, borderRadius: 3 },
   tagText: { color: "rgba(255,255,255,0.7)", fontSize: 10, fontWeight: "600" },
-
   desc: { color: "rgba(255,255,255,0.35)", fontSize: 11, marginTop: 2 },
 });

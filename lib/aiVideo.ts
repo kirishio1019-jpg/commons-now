@@ -1,9 +1,7 @@
 // AI Video Generation via Replicate API
-// Uses minimax/video-01-live for text-to-video generation
 
-const REPLICATE_API = "https://api.replicate.com/v1/predictions";
+const API = "https://api.replicate.com/v1/predictions";
 
-// Theme → cinematic prompt templates
 const THEME_PROMPTS: Record<string, string> = {
   植樹: "Cinematic shot of people planting young trees in a beautiful green forest clearing, morning golden sunlight filtering through leaves, warm natural lighting, community gathering outdoors, 4K cinematic quality, shallow depth of field",
   食: "Warm cinematic close-up of hands preparing fresh food in a community kitchen, steam rising from cooking pots, people gathering around a wooden table, golden hour indoor lighting, Japanese home cooking atmosphere, 4K quality",
@@ -22,122 +20,69 @@ const THEME_PROMPTS: Record<string, string> = {
   子どもと: "Joyful cinematic shot of children and parents playing together in a sunny park, colorful activities, genuine laughter, warm family atmosphere, natural lighting, 4K family documentary style",
 };
 
-const DEFAULT_PROMPT = "Cinematic shot of a diverse community gathering outdoors in beautiful natural setting, warm golden hour lighting, people connecting and sharing experiences, 4K quality";
-
 function buildPrompt(theme: string, title: string, description: string): string {
-  const base = THEME_PROMPTS[theme] ?? DEFAULT_PROMPT;
-
-  // Extract key visual cues from title/description
-  const keywords: string[] = [];
-  if (description.includes("朝") || title.includes("朝")) keywords.push("morning sunrise");
-  if (description.includes("夜") || title.includes("夜")) keywords.push("evening twilight");
-  if (description.includes("海") || title.includes("海")) keywords.push("ocean coastline");
-  if (description.includes("山") || title.includes("山")) keywords.push("mountain landscape");
-  if (description.includes("川") || title.includes("川")) keywords.push("riverside");
-  if (description.includes("公園") || title.includes("公園")) keywords.push("park setting");
-  if (description.includes("室内") || title.includes("室内")) keywords.push("indoor space");
-  if (description.includes("春")) keywords.push("cherry blossoms spring");
-  if (description.includes("夏")) keywords.push("bright summer");
-  if (description.includes("秋")) keywords.push("autumn foliage");
-  if (description.includes("冬")) keywords.push("winter atmosphere");
-
-  const extra = keywords.length > 0 ? `, ${keywords.join(", ")}` : "";
-  return `${base}${extra}, smooth camera movement, professional cinematography`;
+  const base = THEME_PROMPTS[theme] ?? "Cinematic shot of a diverse community gathering outdoors in beautiful natural setting, warm golden hour lighting, people connecting and sharing, 4K quality";
+  const kw: string[] = [];
+  if (description.includes("朝") || title.includes("朝")) kw.push("morning sunrise");
+  if (description.includes("夜") || title.includes("夜")) kw.push("evening twilight");
+  if (description.includes("海")) kw.push("ocean coastline");
+  if (description.includes("山")) kw.push("mountain landscape");
+  if (description.includes("川")) kw.push("riverside");
+  if (description.includes("公園")) kw.push("park setting");
+  if (description.includes("春")) kw.push("cherry blossoms spring");
+  if (description.includes("冬")) kw.push("winter atmosphere");
+  return base + (kw.length ? `, ${kw.join(", ")}` : "") + ", smooth camera movement";
 }
 
 export async function generateAIVideo(
-  theme: string,
-  title: string,
-  description: string,
+  theme: string, title: string, description: string,
 ): Promise<string | null> {
   const token = process.env.EXPO_PUBLIC_REPLICATE_TOKEN;
-  if (!token) {
-    console.log("No REPLICATE_TOKEN — skipping AI video generation");
-    return null;
-  }
+  if (!token) return null;
 
   const prompt = buildPrompt(theme, title, description);
 
-  try {
-    // Create prediction
-    const createRes = await fetch(REPLICATE_API, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json",
-        "Prefer": "wait",
-      },
-      body: JSON.stringify({
-        model: "minimax/video-01-live",
-        input: {
-          prompt,
-          prompt_optimizer: true,
-        },
-      }),
-    });
+  // Try multiple models in order of preference
+  const models = [
+    { version: "b01a98e1fdab1a82dd4d1de8dba5a2ef397ac9ef67c26e376b9b79b0a1fa090d", input: { prompt, prompt_optimizer: true } },
+    { version: "1e9e4e9bb1300f6aa7552e1ea7a0bfaa52cf8d36e5eb2aab2c6cfb5344e68b53", input: { prompt } },
+  ];
 
-    if (!createRes.ok) {
-      // Try fallback model
-      const fallbackRes = await fetch(REPLICATE_API, {
+  for (const model of models) {
+    try {
+      const res = await fetch(API, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json",
-          "Prefer": "wait",
         },
-        body: JSON.stringify({
-          model: "luma/ray",
-          input: {
-            prompt,
-          },
-        }),
+        body: JSON.stringify({ version: model.version, input: model.input }),
       });
 
-      if (!fallbackRes.ok) return null;
-      const fallbackData = await fallbackRes.json();
-      return await pollForResult(fallbackData, token);
-    }
-
-    const data = await createRes.json();
-
-    // If "Prefer: wait" worked, output might be ready
-    if (data.status === "succeeded" && data.output) {
-      const output = Array.isArray(data.output) ? data.output[0] : data.output;
-      return typeof output === "string" ? output : null;
-    }
-
-    // Otherwise poll
-    return await pollForResult(data, token);
-  } catch (err) {
-    console.error("AI video generation failed:", err);
-    return null;
-  }
-}
-
-async function pollForResult(prediction: any, token: string): Promise<string | null> {
-  const pollUrl = prediction.urls?.get || `${REPLICATE_API}/${prediction.id}`;
-
-  for (let i = 0; i < 60; i++) {
-    await new Promise((r) => setTimeout(r, 5000));
-
-    try {
-      const res = await fetch(pollUrl, {
-        headers: { "Authorization": `Bearer ${token}` },
-      });
+      if (!res.ok) continue;
       const data = await res.json();
-
-      if (data.status === "succeeded") {
-        const output = Array.isArray(data.output) ? data.output[0] : data.output;
-        return typeof output === "string" ? output : null;
-      }
-
-      if (data.status === "failed" || data.status === "canceled") {
-        return null;
-      }
+      const result = await poll(data.urls?.get || `${API}/${data.id}`, token);
+      if (result) return result;
     } catch {
       continue;
     }
   }
 
+  return null;
+}
+
+async function poll(url: string, token: string): Promise<string | null> {
+  for (let i = 0; i < 90; i++) {
+    await new Promise((r) => setTimeout(r, 4000));
+    try {
+      const res = await fetch(url, { headers: { "Authorization": `Bearer ${token}` } });
+      const d = await res.json();
+      if (d.status === "succeeded") {
+        const out = Array.isArray(d.output) ? d.output[0] : d.output;
+        return typeof out === "string" ? out : null;
+      }
+      if (d.status === "failed" || d.status === "canceled") return null;
+    } catch { continue; }
+  }
   return null;
 }
