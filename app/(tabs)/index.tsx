@@ -58,14 +58,9 @@ export default function FeedScreen() {
   const handleCommit = useCallback(
     (waveId: string) => {
       const current = getCommitLevel(waveId);
-      const next: CommitLevel =
-        current === "none"
-          ? "curious"
-          : current === "curious"
-            ? "maybe"
-            : current === "maybe"
-              ? "going"
-              : "going";
+      const order: CommitLevel[] = ["none", "curious", "maybe", "going"];
+      const idx = order.indexOf(current);
+      const next = idx < order.length - 1 ? order[idx + 1] : order[0];
       updateCommitLevel(waveId, next);
     },
     [getCommitLevel, updateCommitLevel]
@@ -112,12 +107,15 @@ export default function FeedScreen() {
         </Pressable>
       </View>
 
-      {/* FAB - 投稿ボタン */}
+      {/* FAB - TikTok style create button */}
       <Pressable
         style={styles.fab}
         onPress={() => router.push("/wave/create")}
       >
-        <Text style={styles.fabText}>＋</Text>
+        <View style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 24, backgroundColor: "#00F2EA", borderRadius: 8 }} />
+        <View style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 24, backgroundColor: "#FF0050", borderRadius: 8 }} />
+        <View style={{ position: "absolute", left: 4, right: 4, top: 0, bottom: 0, backgroundColor: "#fff", borderRadius: 6 }} />
+        <Text style={[styles.fabText, { color: "#000" }]}>＋</Text>
       </Pressable>
 
       <FlatList
@@ -198,25 +196,24 @@ const styles = StyleSheet.create({
   },
   fab: {
     position: "absolute",
-    bottom: 80,
-    right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: Colors.primary,
+    bottom: 74,
+    alignSelf: "center",
+    left: "50%",
+    marginLeft: -24,
+    width: 48,
+    height: 32,
+    borderRadius: 8,
     justifyContent: "center",
     alignItems: "center",
     zIndex: 200,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 8,
+    overflow: "hidden",
+    flexDirection: "row",
   },
   fabText: {
     color: "#fff",
-    fontSize: 28,
-    fontWeight: "600",
-    lineHeight: 30,
+    fontSize: 22,
+    fontWeight: "800",
+    lineHeight: 24,
+    zIndex: 2,
   },
 });

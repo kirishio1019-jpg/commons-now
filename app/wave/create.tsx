@@ -9,8 +9,10 @@ import {
   Alert,
   ActivityIndicator,
   Platform,
+  Image,
 } from "react-native";
 import { router } from "expo-router";
+import * as ImagePicker from "expo-image-picker";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
 import { Colors } from "../../lib/colors";
@@ -44,6 +46,8 @@ export default function CreateWaveScreen() {
   const [timeStart, setTimeStart] = useState("");
   const [timeEnd, setTimeEnd] = useState("");
   const [capacity, setCapacity] = useState("");
+  const [media, setMedia] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [clipCaption, setClipCaption] = useState("");
   const [posting, setPosting] = useState(false);
 
   const isValid =
@@ -55,12 +59,36 @@ export default function CreateWaveScreen() {
     timeStart.length > 0 &&
     capacity.length > 0;
 
+  const handleSelectMedia = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["videos", "images"],
+      quality: 0.8,
+      videoMaxDuration: 15,
+    });
+    if (!result.canceled && result.assets[0]) {
+      setMedia(result.assets[0]);
+    }
+  };
+
+  const handleRemoveMedia = () => {
+    setMedia(null);
+    setClipCaption("");
+  };
+
+  const showAlert = (title: string, msg?: string) => {
+    if (Platform.OS === "web") {
+      window.alert(msg ? `${title}\n${msg}` : title);
+    } else {
+      Alert.alert(title, msg);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!user || !isValid) return;
 
     setPosting(true);
     try {
-      // First ensure user has an organization (create personal one if needed)
+      // Ensure user has an organization
       let orgId: string;
       const { data: existingOrg } = await supabase
         .from("organizations")
@@ -85,49 +113,82 @@ export default function CreateWaveScreen() {
         orgId = newOrg.id;
       }
 
-      const { error } = await supabase.from("waves").insert({
-        title,
-        theme,
-        description,
-        location: {
-          name: locationName,
-          address: address || locationName,
-          latitude: 35.68,
-          longitude: 139.76,
-        },
-        date,
-        time_start: timeStart,
-        time_end: timeEnd || timeStart,
-        organizer_id: orgId,
-        capacity: parseInt(capacity, 10) || 10,
-        current_participants: 0,
-        eco_impact_target: {
-          trees_planted: 0,
-          water_collected_liters: 0,
-          meals_shared: 0,
-          contributor_count: 0,
-        },
-        image_url: "",
-        is_personalized: false,
-        is_auto_generated: false,
-        status: "upcoming",
-      });
+      // Create wave
+      const { data: wave, error: waveErr } = await supabase
+        .from("waves")
+        .insert({
+          title,
+          theme,
+          description,
+          location: {
+            name: locationName,
+            address: address || locationName,
+            latitude: 35.68,
+            longitude: 139.76,
+          },
+          date,
+          time_start: timeStart,
+          time_end: timeEnd || timeStart,
+          organizer_id: orgId,
+          capacity: parseInt(capacity, 10) || 10,
+          current_participants: 0,
+          eco_impact_target: {
+            trees_planted: 0,
+            water_collected_liters: 0,
+            meals_shared: 0,
+            contributor_count: 0,
+          },
+          image_url: "",
+          is_personalized: false,
+          is_auto_generated: false,
+          status: "upcoming",
+        })
+        .select("id")
+        .single();
 
-      if (error) throw error;
+      if (waveErr) throw waveErr;
 
-      if (Platform.OS === "web") {
-        window.alert("波を作成しました！");
-      } else {
-        Alert.alert("波を作成しました！", "フィードに表示されます。");
+      // Upload clip if attached
+      if (media && wave) {
+        try {
+          const fileExt = media.uri.split(".").pop() ?? "mp4";
+          const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+          const response = await globalThis.fetch(media.uri);
+          const blob = await response.blob();
+
+          const { error: uploadErr } = await supabase.storage
+            .from("clips")
+            .upload(fileName, blob, {
+              contentType: media.type === "video" ? `video/${fileExt}` : `image/${fileExt}`,
+            });
+
+          if (!uploadErr) {
+            const {
+              data: { publicUrl },
+            } = supabase.storage.from("clips").getPublicUrl(fileName);
+
+            await supabase.from("clips").insert({
+              wave_id: wave.id,
+              user_id: user.id,
+              media_url: publicUrl,
+              thumbnail_url: publicUrl,
+              caption: clipCaption || "",
+              duration_sec: media.duration
+                ? Math.min(Math.round(media.duration / 1000), 15)
+                : 0,
+              moderation_status: "pending",
+              feed_score: 0,
+            });
+          }
+        } catch {
+          // Clip upload failed but wave was created — that's OK
+        }
       }
+
+      showAlert("波を作成しました！", "フィードに表示されます。");
       router.back();
     } catch (err: any) {
-      const msg = err.message || "エラーが発生しました";
-      if (Platform.OS === "web") {
-        window.alert("作成に失敗: " + msg);
-      } else {
-        Alert.alert("作成に失敗しました", msg);
-      }
+      showAlert("作成に失敗しました", err.message || "エラーが発生しました");
     } finally {
       setPosting(false);
     }
@@ -185,11 +246,53 @@ export default function CreateWaveScreen() {
         style={[styles.input, styles.textArea]}
         value={description}
         onChangeText={setDescription}
-        placeholder="どんな体験ができるか、誰でも参加できるか、持ち物など..."
+        placeholder="どんな体験ができるか、持ち物など..."
         placeholderTextColor={Colors.textLight}
         multiline
         numberOfLines={4}
       />
+
+      {/* Clip attachment */}
+      <Text style={styles.label}>クリップ（任意）</Text>
+      <Text style={styles.hint}>動画や写真を添付すると、フィードで目を引きます</Text>
+      {media ? (
+        <View style={styles.mediaPreview}>
+          {media.type === "image" ? (
+            <Image
+              source={{ uri: media.uri }}
+              style={styles.mediaThumbnail}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={styles.mediaVideoPlaceholder}>
+              <Text style={styles.mediaVideoIcon}>🎬</Text>
+              <Text style={styles.mediaVideoText}>
+                {media.duration
+                  ? `${Math.round(media.duration / 1000)}秒`
+                  : "動画"}
+              </Text>
+            </View>
+          )}
+          <View style={styles.mediaInfo}>
+            <TextInput
+              style={styles.clipCaptionInput}
+              value={clipCaption}
+              onChangeText={(t) => t.length <= 40 && setClipCaption(t)}
+              placeholder="ひとこと（40字以内）"
+              placeholderTextColor={Colors.textLight}
+            />
+            <Text style={styles.clipCharCount}>{clipCaption.length}/40</Text>
+            <Pressable style={styles.removeMedia} onPress={handleRemoveMedia}>
+              <Text style={styles.removeMediaText}>削除</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : (
+        <Pressable style={styles.mediaButton} onPress={handleSelectMedia}>
+          <Text style={styles.mediaButtonIcon}>📷</Text>
+          <Text style={styles.mediaButtonText}>動画・写真を追加</Text>
+        </Pressable>
+      )}
 
       {/* Location */}
       <Text style={styles.label}>場所の名前</Text>
@@ -297,6 +400,11 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     marginTop: 16,
   },
+  hint: {
+    fontSize: 12,
+    color: Colors.textLight,
+    marginBottom: 8,
+  },
   input: {
     backgroundColor: Colors.bgCard,
     borderWidth: 1,
@@ -333,6 +441,80 @@ const styles = StyleSheet.create({
   },
   themeChipTextActive: {
     color: "#fff",
+  },
+  // Media / Clip
+  mediaButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: Colors.bgCard,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderStyle: "dashed",
+    borderRadius: 12,
+    paddingVertical: 24,
+  },
+  mediaButtonIcon: {
+    fontSize: 24,
+  },
+  mediaButtonText: {
+    fontSize: 15,
+    color: Colors.textSecondary,
+    fontWeight: "500",
+  },
+  mediaPreview: {
+    flexDirection: "row",
+    backgroundColor: Colors.bgCard,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  mediaThumbnail: {
+    width: 100,
+    height: 100,
+  },
+  mediaVideoPlaceholder: {
+    width: 100,
+    height: 100,
+    backgroundColor: Colors.primary,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  mediaVideoIcon: {
+    fontSize: 28,
+  },
+  mediaVideoText: {
+    color: "#fff",
+    fontSize: 12,
+    marginTop: 4,
+  },
+  mediaInfo: {
+    flex: 1,
+    padding: 10,
+    gap: 4,
+  },
+  clipCaptionInput: {
+    fontSize: 14,
+    color: Colors.text,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    paddingBottom: 6,
+  },
+  clipCharCount: {
+    fontSize: 11,
+    color: Colors.textLight,
+    textAlign: "right",
+  },
+  removeMedia: {
+    alignSelf: "flex-start",
+    marginTop: 4,
+  },
+  removeMediaText: {
+    fontSize: 13,
+    color: "#EF4444",
+    fontWeight: "600",
   },
   row: {
     flexDirection: "row",

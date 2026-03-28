@@ -11,59 +11,96 @@ interface CommitButtonProps {
 const LEVELS: { key: CommitLevel; label: string; color: string; emoji: string }[] = [
   { key: "curious", label: "気になる", color: Colors.curious, emoji: "👀" },
   { key: "maybe", label: "たぶん行く", color: Colors.maybe, emoji: "🤔" },
-  { key: "going", label: "行く", color: Colors.going, emoji: "🙌" },
+  { key: "going", label: "行く！", color: Colors.going, emoji: "🙌" },
 ];
 
+const ORDER: CommitLevel[] = ["none", "curious", "maybe", "going"];
+
 function getNextLevel(current: CommitLevel): CommitLevel {
-  if (current === "none") return "curious";
-  if (current === "curious") return "maybe";
-  if (current === "maybe") return "going";
-  return "going"; // already at max
+  const idx = ORDER.indexOf(current);
+  return idx < ORDER.length - 1 ? ORDER[idx + 1] : ORDER[0];
+}
+
+function getPrevLevel(current: CommitLevel): CommitLevel {
+  const idx = ORDER.indexOf(current);
+  return idx > 0 ? ORDER[idx - 1] : ORDER[ORDER.length - 1];
 }
 
 export function CommitButton({ level, onPress }: CommitButtonProps) {
-  const nextLevel = getNextLevel(level);
-  const nextConfig = LEVELS.find((l) => l.key === nextLevel)!;
-
-  if (level === "going") {
-    return (
-      <View style={[styles.button, styles.buttonDone, { backgroundColor: Colors.going }]}>
-        <Text style={styles.buttonText}>🙌 参加予定です</Text>
-      </View>
-    );
-  }
+  const currentIndex = ORDER.indexOf(level);
 
   return (
     <View style={styles.container}>
-      {/* Progress indicator */}
+      {/* Progress dots */}
       <View style={styles.progressRow}>
         {LEVELS.map((l, i) => {
-          const levelIndex = LEVELS.findIndex((x) => x.key === level);
-          const isActive = i <= levelIndex;
+          const isActive = i < currentIndex;
+          const isCurrent = ORDER[currentIndex] === l.key;
           return (
             <View
               key={l.key}
               style={[
                 styles.dot,
-                { backgroundColor: isActive ? l.color : Colors.border },
+                {
+                  backgroundColor: isActive || isCurrent ? l.color : Colors.border,
+                  transform: [{ scale: isCurrent ? 1.3 : 1 }],
+                },
               ]}
             />
           );
         })}
       </View>
 
-      <Pressable
-        style={[styles.button, { backgroundColor: nextConfig.color }]}
-        onPress={() => onPress(nextLevel)}
-      >
-        <Text style={styles.buttonText}>
-          {nextConfig.emoji} {nextConfig.label}
-        </Text>
-      </Pressable>
+      <View style={styles.buttonRow}>
+        {/* Down button */}
+        {level !== "none" && (
+          <Pressable
+            style={styles.arrowButton}
+            onPress={() => onPress(getPrevLevel(level))}
+          >
+            <Text style={styles.arrowText}>←</Text>
+          </Pressable>
+        )}
+
+        {/* Main button */}
+        <Pressable
+          style={[
+            styles.button,
+            {
+              backgroundColor:
+                level === "going"
+                  ? Colors.going
+                  : level === "none"
+                    ? Colors.curious
+                    : (LEVELS.find((l) => l.key === getNextLevel(level))?.color ?? Colors.curious),
+            },
+          ]}
+          onPress={() => onPress(getNextLevel(level))}
+        >
+          <Text style={styles.buttonText}>
+            {level === "none"
+              ? "👀 気になる"
+              : level === "going"
+                ? "✅ 参加予定"
+                : `${LEVELS.find((l) => l.key === getNextLevel(level))?.emoji} ${LEVELS.find((l) => l.key === getNextLevel(level))?.label}`}
+          </Text>
+        </Pressable>
+
+        {/* Up button (when going, allow cycling to none) */}
+        {level === "going" && (
+          <Pressable
+            style={styles.arrowButton}
+            onPress={() => onPress("none")}
+          >
+            <Text style={styles.arrowText}>✕</Text>
+          </Pressable>
+        )}
+      </View>
 
       {level !== "none" && (
         <Text style={styles.currentLabel}>
-          現在: {LEVELS.find((l) => l.key === level)?.label}
+          {LEVELS.find((l) => l.key === level)?.emoji}{" "}
+          {LEVELS.find((l) => l.key === level)?.label ?? "未設定"}
         </Text>
       )}
     </View>
@@ -84,15 +121,30 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
   },
+  buttonRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  arrowButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0,0,0,0.06)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  arrowText: {
+    fontSize: 16,
+    color: Colors.textSecondary,
+    fontWeight: "700",
+  },
   button: {
     paddingVertical: 14,
     paddingHorizontal: 32,
     borderRadius: 28,
-    minWidth: 200,
+    minWidth: 180,
     alignItems: "center",
-  },
-  buttonDone: {
-    opacity: 0.9,
   },
   buttonText: {
     color: "#fff",
