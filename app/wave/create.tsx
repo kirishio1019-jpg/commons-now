@@ -18,6 +18,7 @@ import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
 import { Colors } from "../../lib/colors";
 import { AnimatedBackground } from "../../components/AnimatedBackground";
+import { generateVideo } from "../../lib/videoGenerator";
 
 const THEMES = [
   "植樹", "食", "物語", "雨水収集", "音楽", "ヨガ", "アート",
@@ -151,6 +152,26 @@ export default function CreateWaveScreen() {
       }).select("id").single();
       if (waveErr) throw waveErr;
 
+      // Auto-generate video from content
+      if (wave) {
+        try {
+          const videoBlob = await generateVideo(
+            theme, title, description, date,
+            isOnline ? "オンライン" : (locationQuery || locationName.split(",")[0])
+          );
+          if (videoBlob) {
+            const videoName = `generated/${wave.id}.webm`;
+            const { error: vErr } = await supabase.storage
+              .from("clips").upload(videoName, videoBlob, { contentType: "video/webm" });
+            if (!vErr) {
+              const { data: { publicUrl } } = supabase.storage.from("clips").getPublicUrl(videoName);
+              await supabase.from("waves").update({ image_url: publicUrl }).eq("id", wave.id);
+            }
+          }
+        } catch {}
+      }
+
+      // Upload user clip if attached
       if (media && wave) {
         try {
           const fileExt = media.uri.split(".").pop() ?? "mp4";
@@ -186,7 +207,7 @@ export default function CreateWaveScreen() {
         <AnimatedBackground theme={theme} isActive={true} description={description} title={title} />
         <View style={s.previewGradient} />
         <View style={s.previewContent}>
-          <Text style={s.previewLabel}>波を作成しました</Text>
+          <Text style={s.previewLabel}>イベントを作成しました</Text>
           <Text style={s.previewTitle}>{title}</Text>
           <Text style={s.previewTheme}>#{theme}</Text>
           <Text style={s.previewDesc} numberOfLines={3}>{description}</Text>
@@ -205,7 +226,7 @@ export default function CreateWaveScreen() {
 
   return (
     <ScrollView style={s.container} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
-      <Text style={s.heading}>新しい波を起こす</Text>
+      <Text style={s.heading}>イベントを作成</Text>
 
       {/* Theme */}
       <Text style={s.label}>テーマ</Text>
@@ -337,7 +358,7 @@ export default function CreateWaveScreen() {
 
       {/* Submit */}
       <Pressable style={[s.submit, (!isValid || posting) && { opacity: 0.4 }]} onPress={handleSubmit} disabled={!isValid || posting}>
-        {posting ? <ActivityIndicator color="#fff" /> : <Text style={s.submitText}>波を起こす</Text>}
+        {posting ? <ActivityIndicator color="#fff" /> : <Text style={s.submitText}>イベントを作成</Text>}
       </Pressable>
     </ScrollView>
   );

@@ -105,10 +105,10 @@ export default function FeedScreen() {
     return (
       <View style={[styles.container, styles.center]}>
         <Text style={styles.emptyLetter}>C</Text>
-        <Text style={styles.emptyTitle}>まだ波がありません</Text>
-        <Text style={styles.emptySub}>最初の波を起こしてみましょう</Text>
+        <Text style={styles.emptyTitle}>まだイベントがありません</Text>
+        <Text style={styles.emptySub}>最初のイベントを作成してみましょう</Text>
         <Pressable style={styles.emptyButton} onPress={() => router.push("/wave/create")}>
-          <Text style={styles.emptyButtonText}>波を作成</Text>
+          <Text style={styles.emptyButtonText}>イベントを作成</Text>
         </Pressable>
       </View>
     );

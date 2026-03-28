@@ -119,11 +119,11 @@ function AuthGate() {
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen
         name="wave/[id]"
-        options={{ title: "波の詳細", presentation: "card" }}
+        options={{ title: "イベント詳細", presentation: "card" }}
       />
       <Stack.Screen
         name="wave/create"
-        options={{ title: "波を起こす", presentation: "modal" }}
+        options={{ title: "イベントを作成", presentation: "modal" }}
       />
       <Stack.Screen
         name="clip/post"

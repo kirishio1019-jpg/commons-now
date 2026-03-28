@@ -334,7 +334,7 @@ export default function MyPageScreen() {
             ))
           ) : (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyTitle}>まだ波を作成していません</Text>
+              <Text style={styles.emptyTitle}>まだイベントを作成していません</Text>
               <Text style={styles.emptySub}>
                 コミュニティに波を起こしてみましょう
               </Text>
@@ -342,7 +342,7 @@ export default function MyPageScreen() {
                 style={styles.emptyAction}
                 onPress={() => router.push("/wave/create")}
               >
-                <Text style={styles.emptyActionText}>波を作成</Text>
+                <Text style={styles.emptyActionText}>イベントを作成</Text>
               </Pressable>
             </View>
           )
@@ -375,7 +375,7 @@ export default function MyPageScreen() {
               style={styles.emptyAction}
               onPress={() => router.push("/(tabs)")}
             >
-              <Text style={styles.emptyActionText}>波を探す</Text>
+              <Text style={styles.emptyActionText}>イベントを探す</Text>
             </Pressable>
           </View>
         )}

@@ -94,9 +94,9 @@ export default function MapScreen() {
       {/* Bottom sheet - wave list */}
       <View style={styles.bottomSheet}>
         <View style={styles.handle} />
-        <Text style={styles.sheetTitle}>近くの波</Text>
+        <Text style={styles.sheetTitle}>近くのイベント</Text>
         {waves.length === 0 ? (
-          <Text style={styles.emptyText}>まだ波がありません</Text>
+          <Text style={styles.emptyText}>まだイベントがありません</Text>
         ) : (
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             {waves.map((wave) => (
